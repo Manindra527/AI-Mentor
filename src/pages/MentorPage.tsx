@@ -1,22 +1,15 @@
 import { useState } from "react";
 import { Send, ArrowRight, CheckCircle2 } from "lucide-react";
 
-const mentorMessages = [
-  { from: "mentor", text: "Good morning. You have 3 study sessions planned today. Start with Quant Practice at 6:00." },
-  { from: "mentor", text: "I noticed your reasoning practice improved this week. But puzzle accuracy is still low. Let's discuss a plan." },
-  { from: "user", text: "How should I improve puzzles?" },
-  { from: "mentor", text: "Your reasoning accuracy dropped from 75% to 62% this week. Let's practice puzzles for 5 days straight focusing on pattern recognition. Start with easier puzzles and build up." },
-];
+interface Message {
+  from: "mentor" | "user";
+  text: string;
+}
 
 const weeklySteps = [
   {
     title: "Weekly Performance Report",
-    content: {
-      studyHours: 23,
-      completion: 78,
-      weakSubject: "Reasoning",
-      strongSubject: "English",
-    },
+    emptyMessage: "Complete at least one week of study sessions to generate your performance report.",
   },
   {
     title: "Mental Check",
@@ -25,12 +18,12 @@ const weeklySteps = [
   },
   {
     title: "Problem Identification",
-    question: "You skipped 2 sessions this week. Was it due to:",
+    question: "What was your biggest challenge this week?",
     options: ["Time constraints", "Topic difficulty", "Lack of motivation", "Personal reasons"],
   },
   {
     title: "Next Week Strategy",
-    content: "Based on your performance, I suggest: Increase Reasoning practice by 30 mins daily. Add 2 revision sessions for Puzzles. Keep English maintenance at current level.",
+    emptyMessage: "Your personalized strategy will appear here after completing the review steps above.",
   },
 ];
 
@@ -38,6 +31,9 @@ const MentorPage = () => {
   const [view, setView] = useState<"chat" | "weekly" | "monthly">("chat");
   const [weeklyStep, setWeeklyStep] = useState(0);
   const [monthlyStep, setMonthlyStep] = useState(0);
+  const [messages] = useState<Message[]>([
+    { from: "mentor", text: "Welcome! I'm your AI study mentor. Start a study session and I'll help you stay on track with personalized coaching." },
+  ]);
 
   if (view === "weekly") {
     const step = weeklySteps[weeklyStep];
@@ -49,7 +45,6 @@ const MentorPage = () => {
           <span className="text-xs text-muted-foreground">{weeklyStep + 1}/4</span>
         </div>
 
-        {/* Progress Bar */}
         <div className="flex gap-1.5">
           {weeklySteps.map((_, i) => (
             <div key={i} className={`h-1 flex-1 rounded-full ${i <= weeklyStep ? "gradient-primary" : "bg-border"}`} />
@@ -59,24 +54,9 @@ const MentorPage = () => {
         <div className="bg-card rounded-2xl shadow-card-lg p-6 animate-fade-in-up">
           <h3 className="font-bold text-lg text-foreground mb-4">Step {weeklyStep + 1}: {step.title}</h3>
 
-          {step.content && typeof step.content === "object" && "studyHours" in step.content && (
-            <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-accent rounded-xl">
-                <span className="text-sm text-muted-foreground">Study Hours</span>
-                <span className="font-bold text-foreground">{step.content.studyHours}h</span>
-              </div>
-              <div className="flex justify-between p-3 bg-accent rounded-xl">
-                <span className="text-sm text-muted-foreground">Planner Completion</span>
-                <span className="font-bold text-primary">{step.content.completion}%</span>
-              </div>
-              <div className="flex justify-between p-3 bg-accent rounded-xl">
-                <span className="text-sm text-muted-foreground">Weak Subject</span>
-                <span className="font-bold text-destructive">{step.content.weakSubject}</span>
-              </div>
-              <div className="flex justify-between p-3 bg-accent rounded-xl">
-                <span className="text-sm text-muted-foreground">Strong Subject</span>
-                <span className="font-bold text-success">{step.content.strongSubject}</span>
-              </div>
+          {step.emptyMessage && (
+            <div className="py-6 text-center">
+              <p className="text-sm text-muted-foreground leading-relaxed">{step.emptyMessage}</p>
             </div>
           )}
 
@@ -92,27 +72,13 @@ const MentorPage = () => {
               </div>
             </div>
           )}
-
-          {step.content && typeof step.content === "string" && (
-            <div>
-              <p className="text-sm text-foreground leading-relaxed">{step.content}</p>
-              <div className="flex items-center gap-2 mt-4 p-3 bg-success/10 rounded-xl">
-                <CheckCircle2 size={16} className="text-success" />
-                <span className="text-sm font-medium text-success">Strategy updated for next week</span>
-              </div>
-            </div>
-          )}
         </div>
 
         <button
           onClick={() => weeklyStep < 3 ? setWeeklyStep(weeklyStep + 1) : setView("chat")}
           className="w-full gradient-primary text-primary-foreground font-semibold py-3 rounded-xl shadow-orange active:scale-95 transition-transform flex items-center justify-center gap-2"
         >
-          {weeklyStep < 3 ? (
-            <>Next Step <ArrowRight size={16} /></>
-          ) : (
-            "Complete Session"
-          )}
+          {weeklyStep < 3 ? <>Next Step <ArrowRight size={16} /></> : "Complete Session"}
         </button>
       </div>
     );
@@ -135,63 +101,30 @@ const MentorPage = () => {
 
         <div className="bg-card rounded-2xl shadow-card-lg p-6 animate-fade-in-up">
           {monthlyStep === 0 && (
-            <div>
-              <h3 className="font-bold text-lg text-foreground mb-4">Monthly Performance Report</h3>
-              <div className="space-y-3">
-                {[
-                  { label: "Total Study Hours", value: "92h", color: "text-foreground" },
-                  { label: "Planner Completion", value: "84%", color: "text-primary" },
-                  { label: "Mock Test Trend", value: "↑ Improving", color: "text-success" },
-                  { label: "Weak Subject", value: "Reasoning", color: "text-destructive" },
-                  { label: "Strong Subject", value: "English", color: "text-success" },
-                ].map((item, i) => (
-                  <div key={i} className="flex justify-between p-3 bg-accent rounded-xl">
-                    <span className="text-sm text-muted-foreground">{item.label}</span>
-                    <span className={`font-bold ${item.color}`}>{item.value}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="py-6 text-center">
+              <h3 className="font-bold text-lg text-foreground mb-3">Monthly Performance Report</h3>
+              <p className="text-sm text-muted-foreground">Complete at least one month of study sessions to see your monthly report.</p>
             </div>
           )}
           {monthlyStep === 1 && (
-            <div>
-              <h3 className="font-bold text-lg text-foreground mb-4">Consistency Analysis</h3>
-              <div className="space-y-3">
-                <div className="p-3 bg-success/10 rounded-xl">
-                  <p className="text-sm font-medium text-success">Best Study Week: Week 2 (28h)</p>
-                </div>
-                <div className="p-3 bg-destructive/10 rounded-xl">
-                  <p className="text-sm font-medium text-destructive">Worst Study Week: Week 4 (18h)</p>
-                </div>
-                <div className="p-3 bg-accent rounded-xl">
-                  <p className="text-sm text-foreground">Missed days: 3 (Travel, Personal)</p>
-                </div>
-              </div>
+            <div className="py-6 text-center">
+              <h3 className="font-bold text-lg text-foreground mb-3">Consistency Analysis</h3>
+              <p className="text-sm text-muted-foreground">Your consistency data will appear here once you have enough study history.</p>
             </div>
           )}
           {monthlyStep === 2 && (
-            <div>
-              <h3 className="font-bold text-lg text-foreground mb-4">Strategy Adjustment</h3>
-              <div className="space-y-3">
-                {["Increase mock frequency to 2x per week", "Add revision sessions for weak topics", "Reduce weak-topic gaps between practice"].map((s, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-accent rounded-xl">
-                    <ArrowRight size={14} className="text-primary mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-foreground">{s}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="py-6 text-center">
+              <h3 className="font-bold text-lg text-foreground mb-3">Strategy Adjustment</h3>
+              <p className="text-sm text-muted-foreground">Strategy suggestions will be generated based on your study patterns.</p>
             </div>
           )}
           {monthlyStep === 3 && (
-            <div>
-              <h3 className="font-bold text-lg text-foreground mb-4">Exam Readiness</h3>
-              <div className="text-center py-4">
-                <div className="inline-flex items-center justify-center w-28 h-28 rounded-full border-4 border-primary mb-3">
-                  <span className="text-3xl font-bold text-primary">63%</span>
-                </div>
-                <p className="text-sm text-foreground font-medium">You are on track</p>
-                <p className="text-xs text-muted-foreground mt-1">But need more mock practice to improve</p>
+            <div className="py-6 text-center">
+              <h3 className="font-bold text-lg text-foreground mb-3">Exam Readiness</h3>
+              <div className="inline-flex items-center justify-center w-28 h-28 rounded-full border-4 border-border mb-3">
+                <span className="text-3xl font-bold text-muted-foreground">—</span>
               </div>
+              <p className="text-sm text-muted-foreground">Take mock tests to see your exam readiness score.</p>
             </div>
           )}
         </div>
@@ -212,7 +145,6 @@ const MentorPage = () => {
         <h1 className="text-2xl font-bold text-foreground">AI Mentor</h1>
       </div>
 
-      {/* Session Buttons */}
       <div className="flex gap-2 mb-4">
         <button
           onClick={() => setView("weekly")}
@@ -228,9 +160,8 @@ const MentorPage = () => {
         </button>
       </div>
 
-      {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto space-y-3 hide-scrollbar">
-        {mentorMessages.map((msg, i) => (
+        {messages.map((msg, i) => (
           <div
             key={i}
             className={`flex ${msg.from === "user" ? "justify-end" : "justify-start"}`}
@@ -251,7 +182,6 @@ const MentorPage = () => {
         ))}
       </div>
 
-      {/* Input */}
       <div className="mt-3 flex gap-2">
         <input
           className="flex-1 bg-card border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
