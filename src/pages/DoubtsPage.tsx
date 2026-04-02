@@ -1,30 +1,22 @@
 import { useState } from "react";
-import { Camera, Send, MessageSquare, Clock } from "lucide-react";
+import { Camera, Send, MessageSquare } from "lucide-react";
 
-const pastDoubts = [
-  {
-    question: "How to solve percentage increase/decrease problems?",
-    subject: "Quant",
-    answer: "Use the formula: Change% = (New - Old) / Old × 100. For successive changes, use the net effect formula.",
-    time: "2 hrs ago",
-  },
-  {
-    question: "What is the difference between syllogism and logical reasoning?",
-    subject: "Reasoning",
-    answer: "Syllogism involves deductive reasoning from two premises to a conclusion. Logical reasoning is broader and includes puzzles, coding-decoding, etc.",
-    time: "Yesterday",
-  },
-];
+interface Doubt {
+  question: string;
+  subject: string;
+  answer: string;
+  time: string;
+}
 
 const DoubtsPage = () => {
   const [question, setQuestion] = useState("");
+  const [doubts] = useState<Doubt[]>([]);
 
   return (
     <div className="space-y-5 pb-4">
       <h1 className="text-2xl font-bold text-foreground">Doubts</h1>
       <p className="text-sm text-muted-foreground -mt-3">Get instant solutions to your study questions</p>
 
-      {/* Input Area */}
       <div className="bg-card rounded-2xl shadow-card p-5">
         <textarea
           value={question}
@@ -42,29 +34,33 @@ const DoubtsPage = () => {
         </div>
       </div>
 
-      {/* Past Doubts */}
       <div>
         <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
           <MessageSquare size={16} className="text-primary" />
           Recent Doubts
         </h3>
-        <div className="space-y-3">
-          {pastDoubts.map((d, i) => (
-            <div key={i} className="bg-card rounded-2xl shadow-card p-4">
-              <div className="flex items-start justify-between mb-2">
-                <span className="text-xs font-medium gradient-primary text-primary-foreground px-2 py-0.5 rounded-md">{d.subject}</span>
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock size={10} /> {d.time}
-                </span>
+        {doubts.length > 0 ? (
+          <div className="space-y-3">
+            {doubts.map((d, i) => (
+              <div key={i} className="bg-card rounded-2xl shadow-card p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <span className="text-xs font-medium gradient-primary text-primary-foreground px-2 py-0.5 rounded-md">{d.subject}</span>
+                  <span className="text-xs text-muted-foreground">{d.time}</span>
+                </div>
+                <p className="text-sm font-medium text-foreground mb-2">{d.question}</p>
+                <div className="bg-accent rounded-xl p-3">
+                  <p className="text-xs font-medium text-primary mb-1">AI Solution</p>
+                  <p className="text-sm text-foreground leading-relaxed">{d.answer}</p>
+                </div>
               </div>
-              <p className="text-sm font-medium text-foreground mb-2">{d.question}</p>
-              <div className="bg-accent rounded-xl p-3">
-                <p className="text-xs font-medium text-primary mb-1">AI Solution</p>
-                <p className="text-sm text-foreground leading-relaxed">{d.answer}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-card rounded-2xl shadow-card p-8 text-center">
+            <p className="text-sm text-muted-foreground">No doubts asked yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Type a question above or scan from your book</p>
+          </div>
+        )}
       </div>
     </div>
   );

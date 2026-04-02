@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Edit3, Palmtree } from "lucide-react";
+import { ChevronLeft, ChevronRight, Palmtree } from "lucide-react";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DATES = [14, 15, 16, 17, 18, 19, 20];
@@ -12,25 +12,6 @@ interface TimeBlock {
   type: SessionType;
 }
 
-const planData: Record<number, TimeBlock[]> = {
-  15: [
-    { time: "6:00–7:00", subject: "Quant", type: "Concept" },
-    { time: "7:00–7:45", subject: "Quant", type: "Practice" },
-    { time: "8:00–9:00", subject: "Reasoning", type: "Practice" },
-    { time: "9:30–10:30", subject: "English", type: "Revision" },
-  ],
-  16: [
-    { time: "6:00–7:00", subject: "Reasoning", type: "Concept" },
-    { time: "7:00–8:00", subject: "Reasoning", type: "Practice" },
-    { time: "8:30–9:30", subject: "GA", type: "Revision" },
-  ],
-  17: [
-    { time: "6:00–7:30", subject: "Quant", type: "Practice" },
-    { time: "8:00–9:00", subject: "English", type: "Concept" },
-    { time: "9:00–10:00", subject: "Mock", type: "Mock" },
-  ],
-};
-
 const typeColors: Record<SessionType, string> = {
   Concept: "bg-blue-100 text-blue-700",
   Practice: "bg-primary/10 text-primary",
@@ -41,6 +22,7 @@ const typeColors: Record<SessionType, string> = {
 
 const PlannerPage = () => {
   const [selectedDate, setSelectedDate] = useState(15);
+  const [planData] = useState<Record<number, TimeBlock[]>>({});
 
   const blocks = planData[selectedDate] || [];
 
@@ -107,14 +89,12 @@ const PlannerPage = () => {
                   {block.type}
                 </span>
               </div>
-              <button className="text-muted-foreground hover:text-primary p-1">
-                <Edit3 size={16} />
-              </button>
             </div>
           ))
         ) : (
           <div className="bg-card rounded-2xl shadow-card p-8 text-center">
-            <p className="text-muted-foreground text-sm">No sessions planned</p>
+            <p className="text-muted-foreground text-sm">No sessions planned for this day</p>
+            <p className="text-xs text-muted-foreground mt-1">Tap + to add a study session</p>
           </div>
         )}
       </div>
