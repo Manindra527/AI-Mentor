@@ -1,32 +1,55 @@
 import { useState, useEffect, useRef } from "react";
 import { Play, Square, Clock } from "lucide-react";
+import { SESSION_TYPE_COLORS, SESSION_TYPE_LABELS, type SessionType } from "@/lib/store";
+import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-const SESSION_TYPES = ["Concept", "Practice", "Revision", "Mock", "Analysis"] as const;
+const SESSION_TYPES: SessionType[] = ["concept", "practice", "revision", "mock", "analysis"];
 
-const StudyTimer = () => {
+interface StudyTimerProps {
+  isAuthenticated: boolean;
+  onRequireAuth: () => void;
+}
+
+const StudyTimer = ({ isAuthenticated, onRequireAuth }: StudyTimerProps) => {
   const [isRunning, setIsRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [showPicker, setShowPicker] = useState(false);
-  const [sessionType, setSessionType] = useState<string | null>(null);
+  const [sessionType, setSessionType] = useState<SessionType | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (isRunning) {
-      intervalRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+      intervalRef.current = setInterval(() => setElapsed((value) => value + 1), 1000);
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, [isRunning]);
 
-  const formatTime = (s: number) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${remainingSeconds
+      .toString()
+      .padStart(2, "0")}`;
   };
 
-  const handleStart = () => setShowPicker(true);
+  const handleStart = () => {
+    if (!isAuthenticated) {
+      onRequireAuth();
+      return;
+    }
 
-  const selectSession = (type: string) => {
+    setShowPicker(true);
+  };
+
+  const selectSession = (type: SessionType) => {
     setSessionType(type);
     setShowPicker(false);
     setIsRunning(true);
@@ -35,7 +58,9 @@ const StudyTimer = () => {
 
   const handleStop = () => {
     setIsRunning(false);
-    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
     setSessionType(null);
     setElapsed(0);
   };
@@ -47,7 +72,7 @@ const StudyTimer = () => {
         <h3 className="font-semibold text-foreground">Study Timer</h3>
         {sessionType && (
           <span className="ml-auto text-xs font-medium gradient-primary text-primary-foreground px-2.5 py-1 rounded-full">
-            {sessionType}
+            {SESSION_TYPE_LABELS[sessionType]}
           </span>
         )}
       </div>
@@ -85,25 +110,32 @@ const StudyTimer = () => {
         </div>
       </div>
 
-      {showPicker && (
-        <div className="fixed inset-0 bg-foreground/40 flex items-end z-50" onClick={() => setShowPicker(false)}>
-          <div className="bg-card w-full rounded-t-3xl p-6 animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
-            <h4 className="font-bold text-lg text-foreground mb-1">Which session are you starting?</h4>
-            <p className="text-sm text-muted-foreground mb-4">Select your session type</p>
-            <div className="grid grid-cols-2 gap-3">
-              {SESSION_TYPES.map((type) => (
-                <button
-                  key={type}
-                  onClick={() => selectSession(type)}
-                  className="bg-accent text-accent-foreground font-medium py-3 px-4 rounded-xl border border-border hover:border-primary transition-colors active:scale-95"
-                >
-                  {type}
-                </button>
-              ))}
+      <Dialog open={showPicker} onOpenChange={setShowPicker}>
+        <DialogContent className="max-w-sm rounded-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Start Study Session</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <label className="text-xs font-semibold text-foreground block mb-2">Session Type</label>
+              <div className="flex flex-wrap gap-2">
+                {(Object.entries(SESSION_TYPE_LABELS) as [SessionType, string][]).map(([type, label]) => (
+                  <button
+                    key={type}
+                    onClick={() => selectSession(type)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                      SESSION_TYPE_COLORS[type],
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

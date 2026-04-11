@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import BottomNav, { type TabId } from "@/components/BottomNav";
 import HomePage from "@/pages/HomePage";
 import PlannerPage from "@/pages/PlannerPage";
@@ -8,14 +8,26 @@ import DoubtsPage from "@/pages/DoubtsPage";
 import ProgressPage from "@/pages/ProgressPage";
 import SettingsPage from "@/pages/SettingsPage";
 
-const Index = () => {
+interface IndexProps {
+  isAuthenticated: boolean;
+  onRequireAuth: () => void;
+}
+
+const Index = ({ isAuthenticated, onRequireAuth }: IndexProps) => {
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [showSettings, setShowSettings] = useState(false);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setActiveTab("home");
+      setShowSettings(false);
+    }
+  }, [isAuthenticated]);
+
   if (showSettings) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-lg mx-auto px-4 pt-6 pb-24">
+      <div className="h-screen overflow-hidden bg-background">
+        <div className="max-w-lg mx-auto h-full px-4 pt-6">
           <SettingsPage onBack={() => setShowSettings(false)} />
         </div>
       </div>
@@ -24,7 +36,7 @@ const Index = () => {
 
   const renderPage = () => {
     switch (activeTab) {
-      case "home": return <HomePage />;
+      case "home": return <HomePage isAuthenticated={isAuthenticated} onRequireAuth={onRequireAuth} />;
       case "planner": return <PlannerPage />;
       case "journal": return <JournalPage />;
       case "mentor": return <MentorPage />;
@@ -33,14 +45,23 @@ const Index = () => {
     }
   };
 
+  const handleTabChange = (tab: TabId) => {
+    if (!isAuthenticated && tab !== "home") {
+      onRequireAuth();
+      return;
+    }
+
+    setActiveTab(tab);
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-lg mx-auto px-4 pt-6 pb-24">
+    <div className="h-screen overflow-hidden bg-background">
+      <div className="max-w-lg mx-auto h-full flex flex-col px-4 pt-6">
         {/* Settings gear on Home tab */}
         {activeTab === "home" && (
-          <div className="flex justify-end mb-2">
+          <div className="flex justify-end mb-2 flex-shrink-0">
             <button
-              onClick={() => setShowSettings(true)}
+              onClick={() => (isAuthenticated ? setShowSettings(true) : onRequireAuth())}
               className="text-muted-foreground hover:text-primary transition-colors p-1"
               aria-label="Settings"
             >
@@ -48,9 +69,11 @@ const Index = () => {
             </button>
           </div>
         )}
-        {renderPage()}
+        <div className="flex-1 min-h-0">
+          {renderPage()}
+        </div>
       </div>
-      <BottomNav active={activeTab} onChange={setActiveTab} />
+      <BottomNav active={activeTab} onChange={handleTabChange} />
     </div>
   );
 };
