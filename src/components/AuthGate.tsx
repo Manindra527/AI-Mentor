@@ -12,11 +12,34 @@ const AuthGate = () => {
   useEffect(() => {
     let isMounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (isMounted) {
-        setSession(data.session);
+    const restoreSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (!isMounted) {
+        return;
       }
-    });
+
+      if (error || !data.session) {
+        setSession(null);
+        return;
+      }
+
+      // Confirm the stored auth state is still valid before treating the user as signed in.
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (userError || !userData.user) {
+        setSession(null);
+        return;
+      }
+
+      setSession(data.session);
+    };
+
+    void restoreSession();
 
     const {
       data: { subscription },
@@ -26,6 +49,10 @@ const AuthGate = () => {
       if (event === "PASSWORD_RECOVERY") {
         setAuthMode("reset-password");
         setShowAuth(true);
+      }
+
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+        setShowAuth(false);
       }
     });
 

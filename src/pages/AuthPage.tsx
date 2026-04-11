@@ -13,17 +13,13 @@ import { cn } from "@/lib/utils";
 
 export type AuthPageMode = "sign-up" | "sign-in" | "forgot-password" | "reset-password";
 
-const RETURNING_USER_KEY = "ai-mentor-returning-user";
-
 interface AuthPageProps {
   variant?: "page" | "modal";
   initialMode?: AuthPageMode | null;
   onClose?: () => void;
 }
 
-const getDefaultMode = (): AuthPageMode => {
-  return localStorage.getItem(RETURNING_USER_KEY) === "true" ? "sign-in" : "sign-up";
-};
+const getDefaultMode = (): AuthPageMode => "sign-in";
 
 const getFriendlyAuthError = (message: string) => {
   const normalized = message.toLowerCase();
@@ -66,10 +62,6 @@ const AuthPage = ({ variant = "page", initialMode = null, onClose }: AuthPagePro
   const isForgotPassword = mode === "forgot-password";
   const isResetPassword = mode === "reset-password";
 
-  const setReturningUser = () => {
-    localStorage.setItem(RETURNING_USER_KEY, "true");
-  };
-
   const handleSignUp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -107,8 +99,6 @@ const AuthPage = ({ variant = "page", initialMode = null, onClose }: AuthPagePro
       return;
     }
 
-    setReturningUser();
-
     if (data.session) {
       toast.success("Account created. You are now signed in.");
       return;
@@ -139,7 +129,6 @@ const AuthPage = ({ variant = "page", initialMode = null, onClose }: AuthPagePro
       return;
     }
 
-    setReturningUser();
     toast.success("Welcome back.");
   };
 
