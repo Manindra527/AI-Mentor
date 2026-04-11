@@ -1,28 +1,12 @@
 import { useMemo, useState } from "react";
 import { Send, ArrowRight } from "lucide-react";
-import {
-  MOCK_DOUBTS,
-  MOCK_JOURNAL_ENTRIES,
-  MOCK_SCHEDULE,
-  MOCK_TEST_SCORES,
-  SAMPLE_ACTIVE_DATE,
-} from "@/lib/store";
+import { useAppData } from "@/components/AppDataProvider";
+import { getTodayDateKey } from "@/lib/time";
 
 interface Message {
   from: "mentor" | "user";
   text: string;
 }
-
-const getTimeframeSchedule = () => {
-  const end = new Date(`${SAMPLE_ACTIVE_DATE}T00:00:00`);
-  const start = new Date(end);
-  start.setDate(end.getDate() - 6);
-
-  return MOCK_SCHEDULE.filter((block) => {
-    const date = new Date(`${block.date}T00:00:00`);
-    return date >= start && date <= end;
-  });
-};
 
 const getSubjectTotals = (items: { subject: string }[]) =>
   items.reduce<Record<string, number>>((accumulator, item) => {
@@ -30,27 +14,44 @@ const getSubjectTotals = (items: { subject: string }[]) =>
     return accumulator;
   }, {});
 
+const addDays = (isoDate: string, days: number) => {
+  const date = new Date(`${isoDate}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const MentorPage = () => {
+  const { plannerEntries, journalEntries, doubts, mockScores } = useAppData();
   const [view, setView] = useState<"chat" | "weekly" | "monthly">("chat");
   const [weeklyStep, setWeeklyStep] = useState(0);
   const [monthlyStep, setMonthlyStep] = useState(0);
+  const todayDate = getTodayDateKey();
 
-  const weeklySchedule = useMemo(() => getTimeframeSchedule(), []);
+  const weeklySchedule = useMemo(() => {
+    const weekStart = addDays(todayDate, -6);
+    return plannerEntries.filter((block) => block.date >= weekStart && block.date <= todayDate);
+  }, [plannerEntries, todayDate]);
+
   const completedSessions = weeklySchedule.filter((block) => block.completed);
-  const completedRate = Math.round((completedSessions.length / weeklySchedule.length) * 100);
+  const completedRate = weeklySchedule.length > 0 ? Math.round((completedSessions.length / weeklySchedule.length) * 100) : 0;
   const subjectTotals = getSubjectTotals(completedSessions);
   const sortedSubjects = Object.entries(subjectTotals).sort((first, second) => second[1] - first[1]);
-  const strongestSubject = sortedSubjects[0]?.[0] ?? "Quantitative Aptitude";
-  const weakAccuracyEntry = MOCK_JOURNAL_ENTRIES
+  const strongestSubject = sortedSubjects[0]?.[0] ?? "No completed sessions yet";
+  const weakAccuracyEntry = journalEntries
     .filter((entry) => entry.questionsAttempted && entry.correctAnswers !== undefined)
     .sort((first, second) => (first.correctAnswers! / first.questionsAttempted!) - (second.correctAnswers! / second.questionsAttempted!))[0];
-  const weakSubject = weakAccuracyEntry?.subject ?? "Logical Reasoning";
-  const latestMockScore = MOCK_TEST_SCORES[MOCK_TEST_SCORES.length - 1]?.score ?? 0;
+  const weakSubject = weakAccuracyEntry?.subject ?? "No weak subject detected yet";
+  const latestMockScore = mockScores[mockScores.length - 1]?.score ?? 0;
 
   const weeklySteps = [
     {
       title: "Weekly Performance Report",
-      body: `You completed ${completedSessions.length} of ${weeklySchedule.length} planned sessions this week. Your strongest subject was ${strongestSubject}, and the current completion rate is ${completedRate}%.`,
+      body: weeklySchedule.length > 0
+        ? `You completed ${completedSessions.length} of ${weeklySchedule.length} planned sessions this week. Your strongest subject was ${strongestSubject}, and the current completion rate is ${completedRate}%.`
+        : "You do not have enough weekly planner data yet. Add sessions in Planner and mark them done to unlock a fuller report.",
     },
     {
       title: "Mental Check",
@@ -64,14 +65,18 @@ const MentorPage = () => {
     },
     {
       title: "Next Week Strategy",
-      body: `Keep Quantitative Aptitude momentum high, but give extra recovery time to ${weakSubject}. Also revisit your ${MOCK_DOUBTS[0]?.topic?.toLowerCase() ?? "pending doubts"} before the next mock.`,
+      body: doubts.length > 0
+        ? `Keep momentum high in ${strongestSubject}, but give extra recovery time to ${weakSubject}. Also revisit your ${doubts[0]?.topic?.toLowerCase() ?? "open doubts"} before the next mock.`
+        : `Keep momentum high in ${strongestSubject}, but give extra recovery time to ${weakSubject}. Add doubts as they appear so the mentor can guide you more precisely.`,
     },
   ];
 
   const messages: Message[] = [
     {
       from: "mentor",
-      text: `You are doing well overall. This sample week shows ${completedSessions.length} completed sessions, a strongest area in ${strongestSubject}, and your latest mock is ${latestMockScore}%.`,
+      text: weeklySchedule.length > 0
+        ? `You are doing well overall. This week shows ${completedSessions.length} completed sessions, a strongest area in ${strongestSubject}, and your latest mock is ${latestMockScore}%.`
+        : "Create a planner, journal some sessions, and add doubts. Once that data is in your account, I can give much better weekly and monthly guidance.",
     },
   ];
 
@@ -157,19 +162,27 @@ const MentorPage = () => {
             {monthlyStep === 0 && (
               <div className="py-6 text-center">
                 <h3 className="font-bold text-lg text-foreground mb-3">Monthly Performance Report</h3>
-                <p className="text-sm text-muted-foreground">Your sample trend is improving, with mock scores rising from 58% to {latestMockScore}%.</p>
+                <p className="text-sm text-muted-foreground">
+                  {mockScores.length > 0
+                    ? `Your current mock trend ends at ${latestMockScore}%. Keep feeding the app with more scores to sharpen this review.`
+                    : "Add mock scores to unlock a real monthly performance trend."}
+                </p>
               </div>
             )}
             {monthlyStep === 1 && (
               <div className="py-6 text-center">
                 <h3 className="font-bold text-lg text-foreground mb-3">Consistency Analysis</h3>
-                <p className="text-sm text-muted-foreground">You studied across five tracked days in the sample data, with the highest consistency in morning sessions.</p>
+                <p className="text-sm text-muted-foreground">
+                  {completedSessions.length > 0
+                    ? `You completed ${completedSessions.length} planned sessions in the recent tracked week. Keep that rhythm and we can refine it further.`
+                    : "Start completing planner blocks to generate a stronger consistency analysis."}
+                </p>
               </div>
             )}
             {monthlyStep === 2 && (
               <div className="py-6 text-center">
                 <h3 className="font-bold text-lg text-foreground mb-3">Strategy Adjustment</h3>
-                <p className="text-sm text-muted-foreground">Keep mocks for Data Interpretation, but shift more guided practice toward {weakSubject} to improve weak spots faster.</p>
+                <p className="text-sm text-muted-foreground">Keep stronger focus on {weakSubject} while maintaining progress in {strongestSubject}.</p>
               </div>
             )}
             {monthlyStep === 3 && (
@@ -178,7 +191,11 @@ const MentorPage = () => {
                 <div className="inline-flex items-center justify-center w-28 h-28 rounded-full border-4 border-primary/30 mb-3">
                   <span className="text-3xl font-bold text-primary">{latestMockScore}%</span>
                 </div>
-                <p className="text-sm text-muted-foreground">Readiness is improving. Focus on accuracy in {weakSubject} before increasing mock volume.</p>
+                <p className="text-sm text-muted-foreground">
+                  {latestMockScore > 0
+                    ? `Readiness is improving. Focus on accuracy in ${weakSubject} before increasing mock volume.`
+                    : "Mock scores are still missing, so readiness is waiting on more real data."}
+                </p>
               </div>
             )}
           </div>
@@ -219,10 +236,7 @@ const MentorPage = () => {
 
       <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar space-y-3 pb-28">
         {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.from === "user" ? "justify-end" : "justify-start"}`}
-          >
+          <div key={index} className={`flex ${message.from === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed ${
                 message.from === "user"
@@ -230,9 +244,7 @@ const MentorPage = () => {
                   : "bg-card shadow-card text-foreground rounded-bl-md"
               }`}
             >
-              {message.from === "mentor" && (
-                <p className="text-xs font-semibold text-primary mb-1">Mentor</p>
-              )}
+              {message.from === "mentor" && <p className="text-xs font-semibold text-primary mb-1">Mentor</p>}
               {message.text}
             </div>
           </div>

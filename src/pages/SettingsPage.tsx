@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
   Calendar,
@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useAppData } from "@/components/AppDataProvider";
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MENTOR_TIMES = ["6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM"];
@@ -107,23 +108,39 @@ const DetailLayout = ({
 );
 
 const SettingsPage = ({ onBack }: SettingsPageProps) => {
-  const { theme, setTheme } = useTheme();
+  const { profile, saveProfile } = useAppData();
+  const { setTheme } = useTheme();
   const [view, setView] = useState<SettingsView>("menu");
   const [profileName, setProfileName] = useState("Study Warrior");
   const [targetExam, setTargetExam] = useState("UPSC CSE");
   const [dailyHoursGoal, setDailyHoursGoal] = useState("6");
-  const [weekStart, setWeekStart] = useState("Monday");
-  const [mentorDay, setMentorDay] = useState("Sunday");
-  const [mentorTime, setMentorTime] = useState("9:00 AM");
-  const [monthlyReviewDay, setMonthlyReviewDay] = useState("1");
-  const [dailyReminder, setDailyReminder] = useState(true);
-  const [sessionReminder, setSessionReminder] = useState(true);
-  const [mentorReminder, setMentorReminder] = useState(true);
-  const [streakReminder, setStreakReminder] = useState(false);
 
+  useEffect(() => {
+    if (!profile) {
+      return;
+    }
+
+    setProfileName(profile.displayName);
+    setTargetExam(profile.targetExam);
+    setDailyHoursGoal(profile.availableHoursPerDay ? String(profile.availableHoursPerDay) : "");
+  }, [profile]);
+
+  const weekStart = profile?.weekStart ?? "Monday";
+  const mentorDay = profile?.mentorDay ?? "Sunday";
+  const mentorTime = profile?.mentorTime ?? "9:00 AM";
+  const monthlyReviewDay = profile?.monthlyReviewDay ?? "1";
+  const dailyReminder = profile?.dailyReminder ?? true;
+  const sessionReminder = profile?.sessionReminder ?? true;
+  const mentorReminder = profile?.mentorReminder ?? true;
+  const streakReminder = profile?.streakReminder ?? false;
+  const themeLabel = profile?.theme === "dark" ? "Dark" : "Light";
   const monthlyReviewLabel =
     MONTHLY_REVIEW_OPTIONS.find((option) => option.value === monthlyReviewDay)?.label ?? "Day 1";
-  const themeLabel = theme === "dark" ? "Dark" : "Light";
+
+  const saveTheme = async (nextTheme: "light" | "dark") => {
+    setTheme(nextTheme);
+    await saveProfile({ theme: nextTheme });
+  };
 
   if (view === "profile") {
     return (
@@ -134,6 +151,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
             <input
               value={profileName}
               onChange={(event) => setProfileName(event.target.value)}
+              onBlur={() => void saveProfile({ displayName: profileName.trim() || "Study Warrior" })}
               className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
               placeholder="Your name"
             />
@@ -143,6 +161,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
             <input
               value={targetExam}
               onChange={(event) => setTargetExam(event.target.value)}
+              onBlur={() => void saveProfile({ targetExam: targetExam.trim() || "UPSC CSE" })}
               className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
               placeholder="NEET, JEE, UPSC..."
             />
@@ -152,6 +171,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
             <input
               value={dailyHoursGoal}
               onChange={(event) => setDailyHoursGoal(event.target.value)}
+              onBlur={() => void saveProfile({ availableHoursPerDay: Number(dailyHoursGoal) || 0 })}
               className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
               placeholder="6"
             />
@@ -169,7 +189,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
             <label className="text-xs font-medium text-muted-foreground">Choose Theme</label>
             <select
               value={themeLabel}
-              onChange={(event) => setTheme(event.target.value.toLowerCase())}
+              onChange={(event) => void saveTheme(event.target.value.toLowerCase() as "light" | "dark")}
               className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
             >
               <option value="Light">Light</option>
@@ -191,7 +211,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
               <button
                 key={day}
                 type="button"
-                onClick={() => setWeekStart(day)}
+                onClick={() => void saveProfile({ weekStart: day })}
                 className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${
                   weekStart === day
                     ? "gradient-primary text-primary-foreground shadow-orange"
@@ -218,7 +238,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                 <button
                   key={day}
                   type="button"
-                  onClick={() => setMentorDay(day)}
+                  onClick={() => void saveProfile({ mentorDay: day })}
                   className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${
                     mentorDay === day
                       ? "gradient-primary text-primary-foreground shadow-orange"
@@ -238,7 +258,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                 <button
                   key={time}
                   type="button"
-                  onClick={() => setMentorTime(time)}
+                  onClick={() => void saveProfile({ mentorTime: time })}
                   className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${
                     mentorTime === time
                       ? "gradient-primary text-primary-foreground shadow-orange"
@@ -265,7 +285,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
               <button
                 key={option.value}
                 type="button"
-                onClick={() => setMonthlyReviewDay(option.value)}
+                onClick={() => void saveProfile({ monthlyReviewDay: option.value })}
                 className={`w-full py-3 rounded-xl text-sm font-medium transition-colors ${
                   monthlyReviewDay === option.value
                     ? "gradient-primary text-primary-foreground shadow-orange"
@@ -289,25 +309,25 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
             label="Daily study reminder"
             description="Get reminded to start your daily plan."
             value={dailyReminder}
-            onToggle={() => setDailyReminder((value) => !value)}
+            onToggle={() => void saveProfile({ dailyReminder: !dailyReminder })}
           />
           <Toggle
             label="Session start alerts"
             description="Notify before each planned session."
             value={sessionReminder}
-            onToggle={() => setSessionReminder((value) => !value)}
+            onToggle={() => void saveProfile({ sessionReminder: !sessionReminder })}
           />
           <Toggle
             label="Mentor session reminder"
             description="Remind before your weekly check-in and monthly review."
             value={mentorReminder}
-            onToggle={() => setMentorReminder((value) => !value)}
+            onToggle={() => void saveProfile({ mentorReminder: !mentorReminder })}
           />
           <Toggle
             label="Streak protection"
             description="Alert when your study streak is at risk."
             value={streakReminder}
-            onToggle={() => setStreakReminder((value) => !value)}
+            onToggle={() => void saveProfile({ streakReminder: !streakReminder })}
           />
         </div>
       </DetailLayout>

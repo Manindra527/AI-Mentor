@@ -1,12 +1,8 @@
 import { Flame, Target, TrendingUp, Sparkles, Calendar } from "lucide-react";
 import StudyTimer from "@/components/StudyTimer";
-import {
-  MOCK_JOURNAL_ENTRIES,
-  MOCK_SCHEDULE,
-  MOOD_EMOJIS,
-  SAMPLE_ACTIVE_DATE,
-} from "@/lib/store";
-import { formatDisplayTime, formatDisplayTimeRange } from "@/lib/time";
+import { MOOD_EMOJIS } from "@/lib/store";
+import { formatDisplayTime, formatDisplayTimeRange, getTodayDateKey } from "@/lib/time";
+import { useAppData } from "@/components/AppDataProvider";
 
 const getMinutes = (startTime: string, endTime: string) => {
   const [startHour, startMinute] = startTime.split(":").map(Number);
@@ -46,23 +42,27 @@ interface HomePageProps {
 }
 
 const HomePage = ({ isAuthenticated, onRequireAuth }: HomePageProps) => {
+  const { plannerEntries, journalEntries } = useAppData();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
+  const todayDate = getTodayDateKey();
 
-  const todayPlan = MOCK_SCHEDULE.filter((block) => block.date === SAMPLE_ACTIVE_DATE);
-  const todayJournal = MOCK_JOURNAL_ENTRIES.filter((entry) => entry.date === SAMPLE_ACTIVE_DATE);
-  const completedSessions = MOCK_SCHEDULE.filter((block) => block.completed);
+  const todayPlan = plannerEntries.filter((block) => block.date === todayDate);
+  const todayJournal = journalEntries.filter((entry) => entry.date === todayDate);
+  const completedSessions = plannerEntries.filter((block) => block.completed);
   const completedTodayMinutes = todayPlan
     .filter((block) => block.completed)
     .reduce((total, block) => total + getMinutes(block.startTime, block.endTime), 0);
   const doneCount = todayPlan.filter((block) => block.completed).length;
-  const discipline = Math.round((completedSessions.length / MOCK_SCHEDULE.length) * 100);
+  const discipline = plannerEntries.length > 0 ? Math.round((completedSessions.length / plannerEntries.length) * 100) : 0;
   const streak = calculateStreak(completedSessions.map((block) => block.date));
   const todayHours = (completedTodayMinutes / 60).toFixed(1);
   const nextPendingSession = todayPlan.find((block) => !block.completed);
   const suggestion = nextPendingSession
     ? `Your next focus block is ${nextPendingSession.subject} at ${formatDisplayTime(nextPendingSession.startTime)}. Finish that before starting anything new.`
-    : "You cleared today's sample plan. Use the next hour for light revision or mock analysis.";
+    : plannerEntries.length > 0
+      ? "You cleared today's plan. Use the next hour for light revision or mock analysis."
+      : "Create your planner and journal a session to unlock a personalized daily suggestion.";
 
   return (
     <div className="h-full min-h-0 flex flex-col">
@@ -105,25 +105,31 @@ const HomePage = ({ isAuthenticated, onRequireAuth }: HomePageProps) => {
             </span>
           </div>
           <div className="space-y-2.5">
-            {todayPlan.map((item) => (
-              <div
-                key={item.id}
-                className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
-                  item.completed ? "bg-success/10" : "bg-accent"
-                }`}
-              >
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${item.completed ? "bg-success" : "bg-primary"}`} />
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${item.completed ? "text-muted-foreground line-through" : "text-foreground"}`}>
-                    {item.subject}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDisplayTimeRange(item.startTime, item.endTime)}
-                  </p>
+            {todayPlan.length > 0 ? (
+              todayPlan.map((item) => (
+                <div
+                  key={item.id}
+                  className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                    item.completed ? "bg-success/10" : "bg-accent"
+                  }`}
+                >
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${item.completed ? "bg-success" : "bg-primary"}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${item.completed ? "text-muted-foreground line-through" : "text-foreground"}`}>
+                      {item.subject}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDisplayTimeRange(item.startTime, item.endTime)}
+                    </p>
+                  </div>
+                  {item.completed && <span className="text-xs font-medium text-success">Done</span>}
                 </div>
-                {item.completed && <span className="text-xs font-medium text-success">Done</span>}
+              ))
+            ) : (
+              <div className="rounded-xl bg-accent p-4 text-sm text-muted-foreground">
+                No planner sessions for today yet. Create your plan in Planner to fill this space.
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -140,14 +146,20 @@ const HomePage = ({ isAuthenticated, onRequireAuth }: HomePageProps) => {
         <div className="bg-card rounded-2xl shadow-card p-5">
           <h3 className="font-semibold text-foreground mb-3">Today&apos;s Mood Log</h3>
           <div className="space-y-2">
-            {todayJournal.map((entry) => (
-              <div key={entry.id} className="flex items-center justify-between p-3 bg-accent rounded-xl">
-                <span className="text-sm text-foreground font-medium">{entry.topic}</span>
-                <span className="text-sm">
-                  {MOOD_EMOJIS[entry.mood]} {formatMood(entry.mood)}
-                </span>
+            {todayJournal.length > 0 ? (
+              todayJournal.map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between p-3 bg-accent rounded-xl">
+                  <span className="text-sm text-foreground font-medium">{entry.topic}</span>
+                  <span className="text-sm">
+                    {MOOD_EMOJIS[entry.mood]} {formatMood(entry.mood)}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-xl bg-accent p-4 text-sm text-muted-foreground">
+                No journal entries for today yet.
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

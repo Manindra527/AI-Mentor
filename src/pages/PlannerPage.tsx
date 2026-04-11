@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, Lock, Palmtree, PenSquare, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
-  MOCK_SCHEDULE,
-  SAMPLE_ACTIVE_DATE,
   SESSION_TYPE_COLORS,
   SESSION_TYPE_LABELS,
   type SessionType,
@@ -14,6 +12,7 @@ import {
   durationPartsToMinutes,
   formatDisplayTime,
   getDurationBetweenTimes,
+  getTodayDateKey,
   parseDurationValue,
   parseTimeValue,
   to24HourTime,
@@ -22,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { type PlannerSetupData, useAppData } from "@/components/AppDataProvider";
 
 const SESSION_TYPES: SessionType[] = ["concept", "practice", "revision", "mock", "analysis"];
 const EXAM_OPTIONS = [
@@ -37,19 +37,12 @@ const EXAM_OPTIONS = [
   "CA Foundation",
 ] as const;
 
-const PLANNER_SETUP_KEY = "ai-mentor-planner-setup";
-const PLANNER_PLAN_KEY = "ai-mentor-plan-data";
 const TIME_HOUR_OPTIONS = Array.from({ length: 12 }, (_, index) => String(index + 1));
 const TIME_MINUTE_OPTIONS = Array.from({ length: 60 }, (_, index) => index.toString().padStart(2, "0"));
 const DURATION_HOUR_OPTIONS = Array.from({ length: 13 }, (_, index) => String(index));
 const MERIDIEM_OPTIONS: Meridiem[] = ["AM", "PM"];
 
-interface PlannerSetup {
-  targetExam: string;
-  examDate: string;
-  availableHoursPerDay: number;
-  subjects: string[];
-}
+type PlannerSetup = PlannerSetupData;
 
 interface EditFormState {
   id: string;
@@ -163,41 +156,6 @@ const DurationPickerField = ({ label, value, onChange }: DurationPickerFieldProp
   );
 };
 
-const buildSamplePlanData = () =>
-  MOCK_SCHEDULE.reduce<Record<string, TimeBlock[]>>((accumulator, block) => {
-    if (!accumulator[block.date]) {
-      accumulator[block.date] = [];
-    }
-    accumulator[block.date].push(block);
-    return accumulator;
-  }, {});
-
-const loadPlannerSetup = (): PlannerSetup | null => {
-  const raw = localStorage.getItem(PLANNER_SETUP_KEY);
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(raw) as PlannerSetup;
-  } catch {
-    return null;
-  }
-};
-
-const loadPlanData = () => {
-  const raw = localStorage.getItem(PLANNER_PLAN_KEY);
-  if (!raw) {
-    return buildSamplePlanData();
-  }
-
-  try {
-    return JSON.parse(raw) as Record<string, TimeBlock[]>;
-  } catch {
-    return buildSamplePlanData();
-  }
-};
-
 const formatDateKey = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -280,7 +238,7 @@ const generateInitialPlan = (setup: PlannerSetup) => {
   const hoursPerDay = Math.max(1, Number(setup.availableHoursPerDay) || 1);
   const totalDailyMinutes = Math.max(60, Math.round(hoursPerDay * 60));
   const rotationMode = subjects.length > hoursPerDay;
-  const startDate = addDays(SAMPLE_ACTIVE_DATE, 1);
+  const startDate = addDays(getTodayDateKey(), 1);
   const sessionProgress: Record<string, number> = {};
 
   const daysUntilExam = Math.max(
@@ -300,7 +258,7 @@ const generateInitialPlan = (setup: PlannerSetup) => {
       const subject = subjects[dayIndex % subjects.length];
       plan[dateKey] = [
         {
-          id: `generated-${dateKey}-0`,
+          id: crypto.randomUUID(),
           date: dateKey,
           startTime: "06:00",
           endTime: formatTime(360 + totalDailyMinutes),
@@ -319,7 +277,7 @@ const generateInitialPlan = (setup: PlannerSetup) => {
     plan[dateKey] = Array.from({ length: slots }, (_, slotIndex) => {
       const startMinutes = 360 + slotIndex * slotMinutes;
       return {
-        id: `generated-${dateKey}-${slotIndex}`,
+        id: crypto.randomUUID(),
         date: dateKey,
         startTime: formatTime(startMinutes),
         endTime: formatTime(startMinutes + slotMinutes),
@@ -334,26 +292,25 @@ const generateInitialPlan = (setup: PlannerSetup) => {
   return plan;
 };
 
-const getInitialPlannerDate = () => {
-  const initialPlanData = loadPlanData();
-  const keys = Object.keys(initialPlanData).sort();
+const getPreferredPlannerDate = (planData: Record<string, TimeBlock[]>, fallbackDate: string) => {
+  const keys = Object.keys(planData).sort();
 
-  if (keys.includes(SAMPLE_ACTIVE_DATE)) {
-    return SAMPLE_ACTIVE_DATE;
+  if (keys.includes(fallbackDate)) {
+    return fallbackDate;
   }
 
-  return keys[0] ?? SAMPLE_ACTIVE_DATE;
+  return keys[0] ?? fallbackDate;
 };
 
 const PlannerPage = () => {
-  const [plannerSetup, setPlannerSetup] = useState<PlannerSetup | null>(loadPlannerSetup);
+  const { plannerSetup, plannerEntries, isLoading, savePlannerSetup, replacePlannerEntries, upsertPlannerEntry } = useAppData();
+  const todayDate = getTodayDateKey();
   const [setupExam, setSetupExam] = useState("UPSC CSE");
   const [setupExamDate, setSetupExamDate] = useState("");
   const [setupHours, setSetupHours] = useState("2");
   const [subjectInputs, setSubjectInputs] = useState([""]);
-  const [planData, setPlanData] = useState<Record<string, TimeBlock[]>>(loadPlanData);
-  const [selectedDate, setSelectedDate] = useState(getInitialPlannerDate);
-  const [calendarDate, setCalendarDate] = useState(getInitialPlannerDate);
+  const [selectedDate, setSelectedDate] = useState(todayDate);
+  const [calendarDate, setCalendarDate] = useState(todayDate);
   const [showHoliday, setShowHoliday] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createSubject, setCreateSubject] = useState("");
@@ -363,26 +320,71 @@ const PlannerPage = () => {
   const [createSessionType, setCreateSessionType] = useState<SessionType>("concept");
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [postponeBlock, setPostponeBlock] = useState<TimeBlock | null>(null);
-  const [postponeDate, setPostponeDate] = useState(addDays(SAMPLE_ACTIVE_DATE, 2));
+  const [postponeDate, setPostponeDate] = useState(addDays(todayDate, 2));
   const [postponeStartTime, setPostponeStartTime] = useState("09:00");
   const [postponeDurationMinutes, setPostponeDurationMinutes] = useState("60");
 
   useEffect(() => {
-    localStorage.setItem(PLANNER_PLAN_KEY, JSON.stringify(planData));
-  }, [planData]);
+    if (!plannerSetup) {
+      return;
+    }
+
+    setSetupExam(plannerSetup.targetExam);
+    setSetupExamDate(plannerSetup.examDate);
+    setSetupHours(String(plannerSetup.availableHoursPerDay));
+    setSubjectInputs(plannerSetup.subjects.length > 0 ? plannerSetup.subjects : [""]);
+  }, [plannerSetup]);
+
+  const planData = useMemo(() => {
+    return plannerEntries.reduce<Record<string, TimeBlock[]>>((accumulator, block) => {
+      if (!accumulator[block.date]) {
+        accumulator[block.date] = [];
+      }
+
+      accumulator[block.date].push(block);
+      accumulator[block.date].sort((first, second) => first.startTime.localeCompare(second.startTime));
+      return accumulator;
+    }, {});
+  }, [plannerEntries]);
 
   useEffect(() => {
-    if (plannerSetup) {
-      localStorage.setItem(PLANNER_SETUP_KEY, JSON.stringify(plannerSetup));
+    if (!plannerSetup || plannerEntries.length === 0) {
+      return;
     }
-  }, [plannerSetup]);
+
+    if (selectedDate === todayDate && !planData[selectedDate]) {
+      const preferredDate = getPreferredPlannerDate(planData, todayDate);
+      setSelectedDate(preferredDate);
+      setCalendarDate(preferredDate);
+    }
+  }, [plannerEntries.length, plannerSetup, planData, selectedDate, todayDate]);
 
   const weekDates = useMemo(() => getWeekDates(calendarDate), [calendarDate]);
   const blocks = planData[selectedDate] || [];
   const headerDate = new Date(`${calendarDate}T00:00:00`);
   const rotationEnabled = plannerSetup ? plannerSetup.subjects.length > plannerSetup.availableHoursPerDay : false;
 
-  const handleCreateStarterPlan = () => {
+  if (isLoading) {
+    return (
+      <div className="h-full min-h-0 flex flex-col">
+        <div className="sticky top-0 z-10 bg-background pb-4 flex items-center justify-between flex-shrink-0">
+          <h1 className="text-2xl font-bold text-foreground">Study Planner</h1>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar pb-28">
+          <div className="bg-card rounded-3xl shadow-card-lg p-6 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Syncing Planner</p>
+            <h2 className="text-2xl font-bold text-foreground">Loading your plan from Supabase</h2>
+            <p className="text-sm text-muted-foreground">
+              We are pulling your planner data from your account so it stays the same across devices.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const handleCreateStarterPlan = async () => {
     const subjects = subjectInputs.map((subject) => subject.trim()).filter(Boolean);
 
     if (!setupExam || !setupExamDate || !setupHours || subjects.length === 0) {
@@ -398,10 +400,18 @@ const PlannerPage = () => {
     };
 
     const generatedPlan = generateInitialPlan(setup);
-    const firstDate = Object.keys(generatedPlan).sort()[0];
+    const firstDate = Object.keys(generatedPlan).sort()[0] ?? todayDate;
 
-    setPlannerSetup(setup);
-    setPlanData(generatedPlan);
+    const setupSaved = await savePlannerSetup(setup);
+    if (!setupSaved) {
+      return;
+    }
+
+    const planSaved = await replacePlannerEntries(Object.values(generatedPlan).flat());
+    if (!planSaved) {
+      return;
+    }
+
     setSelectedDate(firstDate);
     setCalendarDate(firstDate);
     toast.success("Starter plan created. Topics can be edited before the 11 PM lock.");
@@ -419,7 +429,7 @@ const PlannerPage = () => {
     setSubjectInputs((previous) => (previous.length === 1 ? previous : previous.filter((_, currentIndex) => currentIndex !== index)));
   };
 
-  const handleCreateBlock = () => {
+  const handleCreateBlock = async () => {
     if (!createSubject.trim()) {
       toast.error("Subject is required.");
       return;
@@ -428,7 +438,7 @@ const PlannerPage = () => {
     const durationMinutes = Math.max(15, Number(createDurationMinutes) || 60);
 
     const newBlock: TimeBlock = {
-      id: `custom-${Date.now()}`,
+      id: crypto.randomUUID(),
       date: selectedDate,
       startTime: createStartTime,
       endTime: addMinutesToTime(createStartTime, durationMinutes),
@@ -438,10 +448,11 @@ const PlannerPage = () => {
       completed: false,
     };
 
-    setPlanData((previous) => ({
-      ...previous,
-      [selectedDate]: [...(previous[selectedDate] || []), newBlock],
-    }));
+    const saved = await upsertPlannerEntry(newBlock);
+    if (!saved) {
+      return;
+    }
+
     setCreateSubject("");
     setCreateTopic("");
     setCreateStartTime("09:00");
@@ -450,60 +461,61 @@ const PlannerPage = () => {
     setShowCreateDialog(false);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editForm) {
       return;
     }
 
-    setPlanData((previous) => ({
-      ...previous,
-      [editForm.date]: (previous[editForm.date] || []).map((block) =>
-        block.id === editForm.id
-          ? {
-              ...block,
-              subject: editForm.subject.trim(),
-              topic: editForm.topic.trim(),
-              startTime: editForm.startTime,
-              endTime: addMinutesToTime(editForm.startTime, Math.max(15, Number(editForm.durationMinutes) || 60)),
-              sessionType: editForm.sessionType,
-            }
-          : block,
-      ),
-    }));
+    const saved = await upsertPlannerEntry({
+      id: editForm.id,
+      date: editForm.date,
+      subject: editForm.subject.trim(),
+      topic: editForm.topic.trim(),
+      startTime: editForm.startTime,
+      endTime: addMinutesToTime(editForm.startTime, Math.max(15, Number(editForm.durationMinutes) || 60)),
+      sessionType: editForm.sessionType,
+      completed: false,
+    });
+
+    if (!saved) {
+      return;
+    }
+
     setEditForm(null);
   };
 
-  const handlePostpone = () => {
+  const handlePostpone = async () => {
     if (!postponeBlock) {
       return;
     }
 
-    setPlanData((previous) => {
-      const nextPlan = { ...previous };
-      nextPlan[postponeBlock.date] = (nextPlan[postponeBlock.date] || []).filter((block) => block.id !== postponeBlock.id);
-      nextPlan[postponeDate] = [
-        ...(nextPlan[postponeDate] || []),
-        {
-          ...postponeBlock,
-          date: postponeDate,
-          startTime: postponeStartTime,
-          endTime: addMinutesToTime(postponeStartTime, Math.max(15, Number(postponeDurationMinutes) || 60)),
-          completed: false,
-        },
-      ];
-      return nextPlan;
+    const saved = await upsertPlannerEntry({
+      ...postponeBlock,
+      date: postponeDate,
+      startTime: postponeStartTime,
+      endTime: addMinutesToTime(postponeStartTime, Math.max(15, Number(postponeDurationMinutes) || 60)),
+      completed: false,
     });
+
+    if (!saved) {
+      return;
+    }
 
     setPostponeBlock(null);
     toast.success("Time block postponed.");
   };
 
-  const handleMarkHoliday = (reason: string) => {
+  const handleMarkHoliday = async (reason: string) => {
     if (!plannerSetup) {
       return;
     }
 
-    setPlanData((previous) => shiftPlanForwardForHoliday(previous, selectedDate, plannerSetup.examDate));
+    const shiftedPlan = shiftPlanForwardForHoliday(planData, selectedDate, plannerSetup.examDate);
+    const saved = await replacePlannerEntries(Object.values(shiftedPlan).flat());
+    if (!saved) {
+      return;
+    }
+
     setShowHoliday(false);
     toast.success(`${selectedDate} marked as ${reason}. Plan shifted forward and trimmed at the target date.`);
   };
