@@ -1,12 +1,28 @@
 import { useMemo, useState } from "react";
-import { Send, ArrowRight } from "lucide-react";
-import { useAppData } from "@/components/AppDataProvider";
-import { getTodayDateKey } from "@/lib/time";
+import { Send, ArrowRight, ChevronLeft } from "lucide-react";
+import {
+  MOCK_DOUBTS,
+  MOCK_JOURNAL_ENTRIES,
+  MOCK_SCHEDULE,
+  MOCK_TEST_SCORES,
+  SAMPLE_ACTIVE_DATE,
+} from "@/lib/store";
 
 interface Message {
   from: "mentor" | "user";
   text: string;
 }
+
+const getTimeframeSchedule = () => {
+  const end = new Date(`${SAMPLE_ACTIVE_DATE}T00:00:00`);
+  const start = new Date(end);
+  start.setDate(end.getDate() - 6);
+
+  return MOCK_SCHEDULE.filter((block) => {
+    const date = new Date(`${block.date}T00:00:00`);
+    return date >= start && date <= end;
+  });
+};
 
 const getSubjectTotals = (items: { subject: string }[]) =>
   items.reduce<Record<string, number>>((accumulator, item) => {
@@ -14,44 +30,30 @@ const getSubjectTotals = (items: { subject: string }[]) =>
     return accumulator;
   }, {});
 
-const addDays = (isoDate: string, days: number) => {
-  const date = new Date(`${isoDate}T00:00:00`);
-  date.setDate(date.getDate() + days);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
 const MentorPage = () => {
-  const { plannerEntries, journalEntries, doubts, mockScores } = useAppData();
   const [view, setView] = useState<"chat" | "weekly" | "monthly">("chat");
   const [weeklyStep, setWeeklyStep] = useState(0);
   const [monthlyStep, setMonthlyStep] = useState(0);
-  const todayDate = getTodayDateKey();
 
-  const weeklySchedule = useMemo(() => {
-    const weekStart = addDays(todayDate, -6);
-    return plannerEntries.filter((block) => block.date >= weekStart && block.date <= todayDate);
-  }, [plannerEntries, todayDate]);
-
+  const weeklySchedule = useMemo(() => getTimeframeSchedule(), []);
   const completedSessions = weeklySchedule.filter((block) => block.completed);
-  const completedRate = weeklySchedule.length > 0 ? Math.round((completedSessions.length / weeklySchedule.length) * 100) : 0;
+  const completedRate = Math.round((completedSessions.length / weeklySchedule.length) * 100);
   const subjectTotals = getSubjectTotals(completedSessions);
   const sortedSubjects = Object.entries(subjectTotals).sort((first, second) => second[1] - first[1]);
-  const strongestSubject = sortedSubjects[0]?.[0] ?? "No completed sessions yet";
-  const weakAccuracyEntry = journalEntries
+  const strongestSubject = sortedSubjects[0]?.[0] ?? "Quantitative Aptitude";
+  const weakAccuracyEntry = MOCK_JOURNAL_ENTRIES
     .filter((entry) => entry.questionsAttempted && entry.correctAnswers !== undefined)
-    .sort((first, second) => (first.correctAnswers! / first.questionsAttempted!) - (second.correctAnswers! / second.questionsAttempted!))[0];
-  const weakSubject = weakAccuracyEntry?.subject ?? "No weak subject detected yet";
-  const latestMockScore = mockScores[mockScores.length - 1]?.score ?? 0;
+    .sort(
+      (first, second) =>
+        (first.correctAnswers! / first.questionsAttempted!) - (second.correctAnswers! / second.questionsAttempted!),
+    )[0];
+  const weakSubject = weakAccuracyEntry?.subject ?? "Logical Reasoning";
+  const latestMockScore = MOCK_TEST_SCORES[MOCK_TEST_SCORES.length - 1]?.score ?? 0;
 
   const weeklySteps = [
     {
       title: "Weekly Performance Report",
-      body: weeklySchedule.length > 0
-        ? `You completed ${completedSessions.length} of ${weeklySchedule.length} planned sessions this week. Your strongest subject was ${strongestSubject}, and the current completion rate is ${completedRate}%.`
-        : "You do not have enough weekly planner data yet. Add sessions in Planner and mark them done to unlock a fuller report.",
+      body: `You completed ${completedSessions.length} of ${weeklySchedule.length} planned sessions this week. Your strongest subject was ${strongestSubject}, and the current completion rate is ${completedRate}%.`,
     },
     {
       title: "Mental Check",
@@ -65,18 +67,16 @@ const MentorPage = () => {
     },
     {
       title: "Next Week Strategy",
-      body: doubts.length > 0
-        ? `Keep momentum high in ${strongestSubject}, but give extra recovery time to ${weakSubject}. Also revisit your ${doubts[0]?.topic?.toLowerCase() ?? "open doubts"} before the next mock.`
-        : `Keep momentum high in ${strongestSubject}, but give extra recovery time to ${weakSubject}. Add doubts as they appear so the mentor can guide you more precisely.`,
+      body: `Keep Quantitative Aptitude momentum high, but give extra recovery time to ${weakSubject}. Also revisit your ${
+        MOCK_DOUBTS[0]?.topic?.toLowerCase() ?? "pending doubts"
+      } before the next mock.`,
     },
   ];
 
   const messages: Message[] = [
     {
       from: "mentor",
-      text: weeklySchedule.length > 0
-        ? `You are doing well overall. This week shows ${completedSessions.length} completed sessions, a strongest area in ${strongestSubject}, and your latest mock is ${latestMockScore}%.`
-        : "Create a planner, journal some sessions, and add doubts. Once that data is in your account, I can give much better weekly and monthly guidance.",
+      text: `You are doing well overall. This sample week shows ${completedSessions.length} completed sessions, a strongest area in ${strongestSubject}, and your latest mock is ${latestMockScore}%.`,
     },
   ];
 
@@ -87,8 +87,15 @@ const MentorPage = () => {
       <div className="h-full min-h-0 flex flex-col">
         <div className="sticky top-0 z-10 bg-background pb-4 space-y-5 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <button onClick={() => { setView("chat"); setWeeklyStep(0); }} className="text-sm text-primary font-semibold">
-              ← Back
+            <button
+              onClick={() => {
+                setView("chat");
+                setWeeklyStep(0);
+              }}
+              className="inline-flex items-center gap-1 text-sm text-primary font-semibold"
+            >
+              <ChevronLeft size={16} />
+              <span>Back</span>
             </button>
             <h2 className="font-bold text-foreground">Weekly Mentor Session</h2>
             <span className="text-xs text-muted-foreground">{weeklyStep + 1}/4</span>
@@ -96,7 +103,10 @@ const MentorPage = () => {
 
           <div className="flex gap-1.5">
             {weeklySteps.map((_, index) => (
-              <div key={index} className={`h-1 flex-1 rounded-full ${index <= weeklyStep ? "gradient-primary" : "bg-border"}`} />
+              <div
+                key={index}
+                className={`h-1 flex-1 rounded-full ${index <= weeklyStep ? "gradient-primary" : "bg-border"}`}
+              />
             ))}
           </div>
         </div>
@@ -118,7 +128,10 @@ const MentorPage = () => {
                 <p className="text-sm text-foreground mb-3">{step.question}</p>
                 <div className="space-y-2">
                   {step.options?.map((option) => (
-                    <button key={option} className="w-full text-left p-3 rounded-xl bg-accent text-sm text-foreground border border-border hover:border-primary transition-colors active:scale-[0.98]">
+                    <button
+                      key={option}
+                      className="w-full text-left p-3 rounded-xl bg-accent text-sm text-foreground border border-border hover:border-primary transition-colors active:scale-[0.98]"
+                    >
                       {option}
                     </button>
                   ))}
@@ -131,7 +144,13 @@ const MentorPage = () => {
             onClick={() => (weeklyStep < 3 ? setWeeklyStep(weeklyStep + 1) : setView("chat"))}
             className="w-full gradient-primary text-primary-foreground font-semibold py-3 rounded-xl shadow-orange active:scale-95 transition-transform flex items-center justify-center gap-2"
           >
-            {weeklyStep < 3 ? <>Next Step <ArrowRight size={16} /></> : "Complete Session"}
+            {weeklyStep < 3 ? (
+              <>
+                Next Step <ArrowRight size={16} />
+              </>
+            ) : (
+              "Complete Session"
+            )}
           </button>
         </div>
       </div>
@@ -143,8 +162,15 @@ const MentorPage = () => {
       <div className="h-full min-h-0 flex flex-col">
         <div className="sticky top-0 z-10 bg-background pb-4 space-y-5 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <button onClick={() => { setView("chat"); setMonthlyStep(0); }} className="text-sm text-primary font-semibold">
-              ← Back
+            <button
+              onClick={() => {
+                setView("chat");
+                setMonthlyStep(0);
+              }}
+              className="inline-flex items-center gap-1 text-sm text-primary font-semibold"
+            >
+              <ChevronLeft size={16} />
+              <span>Back</span>
             </button>
             <h2 className="font-bold text-foreground">Monthly Mentor Review</h2>
             <span className="text-xs text-muted-foreground">{monthlyStep + 1}/4</span>
@@ -152,7 +178,10 @@ const MentorPage = () => {
 
           <div className="flex gap-1.5">
             {[0, 1, 2, 3].map((index) => (
-              <div key={index} className={`h-1 flex-1 rounded-full ${index <= monthlyStep ? "gradient-primary" : "bg-border"}`} />
+              <div
+                key={index}
+                className={`h-1 flex-1 rounded-full ${index <= monthlyStep ? "gradient-primary" : "bg-border"}`}
+              />
             ))}
           </div>
         </div>
@@ -163,9 +192,7 @@ const MentorPage = () => {
               <div className="py-6 text-center">
                 <h3 className="font-bold text-lg text-foreground mb-3">Monthly Performance Report</h3>
                 <p className="text-sm text-muted-foreground">
-                  {mockScores.length > 0
-                    ? `Your current mock trend ends at ${latestMockScore}%. Keep feeding the app with more scores to sharpen this review.`
-                    : "Add mock scores to unlock a real monthly performance trend."}
+                  Your sample trend is improving, with mock scores rising from 58% to {latestMockScore}%.
                 </p>
               </div>
             )}
@@ -173,16 +200,18 @@ const MentorPage = () => {
               <div className="py-6 text-center">
                 <h3 className="font-bold text-lg text-foreground mb-3">Consistency Analysis</h3>
                 <p className="text-sm text-muted-foreground">
-                  {completedSessions.length > 0
-                    ? `You completed ${completedSessions.length} planned sessions in the recent tracked week. Keep that rhythm and we can refine it further.`
-                    : "Start completing planner blocks to generate a stronger consistency analysis."}
+                  You studied across five tracked days in the sample data, with the highest consistency in morning
+                  sessions.
                 </p>
               </div>
             )}
             {monthlyStep === 2 && (
               <div className="py-6 text-center">
                 <h3 className="font-bold text-lg text-foreground mb-3">Strategy Adjustment</h3>
-                <p className="text-sm text-muted-foreground">Keep stronger focus on {weakSubject} while maintaining progress in {strongestSubject}.</p>
+                <p className="text-sm text-muted-foreground">
+                  Keep mocks for Data Interpretation, but shift more guided practice toward {weakSubject} to improve
+                  weak spots faster.
+                </p>
               </div>
             )}
             {monthlyStep === 3 && (
@@ -192,9 +221,7 @@ const MentorPage = () => {
                   <span className="text-3xl font-bold text-primary">{latestMockScore}%</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {latestMockScore > 0
-                    ? `Readiness is improving. Focus on accuracy in ${weakSubject} before increasing mock volume.`
-                    : "Mock scores are still missing, so readiness is waiting on more real data."}
+                  Readiness is improving. Focus on accuracy in {weakSubject} before increasing mock volume.
                 </p>
               </div>
             )}
@@ -204,7 +231,13 @@ const MentorPage = () => {
             onClick={() => (monthlyStep < 3 ? setMonthlyStep(monthlyStep + 1) : setView("chat"))}
             className="w-full gradient-primary text-primary-foreground font-semibold py-3 rounded-xl shadow-orange active:scale-95 transition-transform flex items-center justify-center gap-2"
           >
-            {monthlyStep < 3 ? <>Next Step <ArrowRight size={16} /></> : "Complete Review"}
+            {monthlyStep < 3 ? (
+              <>
+                Next Step <ArrowRight size={16} />
+              </>
+            ) : (
+              "Complete Review"
+            )}
           </button>
         </div>
       </div>

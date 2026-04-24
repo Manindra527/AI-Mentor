@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
 import { BarChart3, TrendingUp, Award, Target } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LineChart, Line, Tooltip } from "recharts";
-import { useAppData } from "@/components/AppDataProvider";
-import { getTodayDateKey } from "@/lib/time";
+import {
+  MOCK_JOURNAL_ENTRIES,
+  MOCK_SCHEDULE,
+  MOCK_TEST_SCORES,
+  SAMPLE_ACTIVE_DATE,
+} from "@/lib/store";
 
 type TimeFrame = "daily" | "weekly" | "monthly";
 
@@ -12,13 +16,17 @@ const getMinutes = (startTime: string, endTime: string) => {
   return endHour * 60 + endMinute - (startHour * 60 + startMinute);
 };
 
-const addDays = (isoDate: string, days: number) => {
-  const date = new Date(`${isoDate}T00:00:00`);
-  date.setDate(date.getDate() + days);
+const formatDateKey = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+};
+
+const addDays = (isoDate: string, days: number) => {
+  const date = new Date(`${isoDate}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return formatDateKey(date);
 };
 
 const getStreak = (dates: string[]) => {
@@ -46,35 +54,33 @@ const getStreak = (dates: string[]) => {
 };
 
 const ProgressPage = () => {
-  const { plannerEntries, journalEntries, mockScores } = useAppData();
   const [tab, setTab] = useState<TimeFrame>("weekly");
-  const todayDate = getTodayDateKey();
 
   const timeframeSchedule = useMemo(() => {
     if (tab === "daily") {
-      return plannerEntries.filter((block) => block.date === todayDate);
+      return MOCK_SCHEDULE.filter((block) => block.date === SAMPLE_ACTIVE_DATE);
     }
 
     if (tab === "weekly") {
-      const weekStart = addDays(todayDate, -6);
-      return plannerEntries.filter((block) => block.date >= weekStart && block.date <= todayDate);
+      const weekStart = addDays(SAMPLE_ACTIVE_DATE, -6);
+      return MOCK_SCHEDULE.filter((block) => block.date >= weekStart && block.date <= SAMPLE_ACTIVE_DATE);
     }
 
-    return plannerEntries;
-  }, [plannerEntries, tab, todayDate]);
+    return MOCK_SCHEDULE;
+  }, [tab]);
 
   const timeframeJournal = useMemo(() => {
     if (tab === "daily") {
-      return journalEntries.filter((entry) => entry.date === todayDate);
+      return MOCK_JOURNAL_ENTRIES.filter((entry) => entry.date === SAMPLE_ACTIVE_DATE);
     }
 
     if (tab === "weekly") {
-      const weekStart = addDays(todayDate, -6);
-      return journalEntries.filter((entry) => entry.date >= weekStart && entry.date <= todayDate);
+      const weekStart = addDays(SAMPLE_ACTIVE_DATE, -6);
+      return MOCK_JOURNAL_ENTRIES.filter((entry) => entry.date >= weekStart && entry.date <= SAMPLE_ACTIVE_DATE);
     }
 
-    return journalEntries;
-  }, [journalEntries, tab, todayDate]);
+    return MOCK_JOURNAL_ENTRIES;
+  }, [tab]);
 
   const studyData = useMemo(() => {
     if (tab === "daily") {
@@ -108,6 +114,8 @@ const ProgressPage = () => {
     }));
   }, [tab, timeframeSchedule]);
 
+  const mockScores = MOCK_TEST_SCORES.map((score) => ({ test: score.test, score: score.score }));
+
   const moodData = timeframeJournal.reduce<Record<string, number>>((accumulator, entry) => {
     const label = entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1);
     accumulator[label] = (accumulator[label] || 0) + 1;
@@ -116,10 +124,10 @@ const ProgressPage = () => {
 
   const totalStudyHours = studyData.reduce((total, item) => total + item.hours, 0);
   const completedCount = timeframeSchedule.filter((block) => block.completed).length;
-  const plannerCompletion = timeframeSchedule.length > 0 ? Math.round((completedCount / timeframeSchedule.length) * 100) : 0;
-  const streak = getStreak(plannerEntries.filter((block) => block.completed).map((block) => block.date));
+  const plannerCompletion = Math.round((completedCount / timeframeSchedule.length) * 100);
+  const streak = getStreak(MOCK_SCHEDULE.filter((block) => block.completed).map((block) => block.date));
   const completedDays = new Set(timeframeSchedule.filter((block) => block.completed).map((block) => block.date)).size;
-  const timeframeDays = tab === "daily" ? 1 : tab === "weekly" ? 7 : Math.max(1, new Set(timeframeSchedule.map((block) => block.date)).size);
+  const timeframeDays = tab === "daily" ? 1 : tab === "weekly" ? 7 : new Set(timeframeSchedule.map((block) => block.date)).size;
   const consistency = Math.round((completedDays / timeframeDays) * 100);
 
   const subjectMinutes = timeframeJournal.reduce<Record<string, number>>((accumulator, entry) => {
@@ -127,8 +135,8 @@ const ProgressPage = () => {
     return accumulator;
   }, {});
   const subjectRankings = Object.entries(subjectMinutes).sort((first, second) => second[1] - first[1]);
-  const strongSubject = subjectRankings[0]?.[0] ?? "No data yet";
-  const weakSubject = subjectRankings[subjectRankings.length - 1]?.[0] ?? "No data yet";
+  const strongSubject = subjectRankings[0]?.[0] ?? "Quantitative Aptitude";
+  const weakSubject = subjectRankings[subjectRankings.length - 1]?.[0] ?? "Logical Reasoning";
 
   return (
     <div className="h-full min-h-0 flex flex-col">
@@ -176,38 +184,30 @@ const ProgressPage = () => {
 
         <div className="bg-card rounded-2xl shadow-card p-5">
           <h3 className="font-semibold text-foreground mb-4">Study Hours</h3>
-          {studyData.length > 0 ? (
-            <div className="h-40">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={studyData}>
-                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(20 8% 50%)" }} />
-                  <YAxis hide />
-                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "var(--shadow-md)", fontSize: "12px" }} />
-                  <Bar dataKey="hours" fill="hsl(24 95% 53%)" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No study data yet.</p>
-          )}
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={studyData}>
+                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(20 8% 50%)" }} />
+                <YAxis hide />
+                <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "var(--shadow-md)", fontSize: "12px" }} />
+                <Bar dataKey="hours" fill="hsl(24 95% 53%)" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         <div className="bg-card rounded-2xl shadow-card p-5">
           <h3 className="font-semibold text-foreground mb-4">Mock Test Improvement</h3>
-          {mockScores.length > 0 ? (
-            <div className="h-40">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={mockScores}>
-                  <XAxis dataKey="test" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(20 8% 50%)" }} />
-                  <YAxis hide domain={[50, 100]} />
-                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "var(--shadow-md)", fontSize: "12px" }} />
-                  <Line type="monotone" dataKey="score" stroke="hsl(142 70% 45%)" strokeWidth={2.5} dot={{ fill: "hsl(142 70% 45%)", r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No mock scores saved yet.</p>
-          )}
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={mockScores}>
+                <XAxis dataKey="test" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(20 8% 50%)" }} />
+                <YAxis hide domain={[50, 100]} />
+                <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "var(--shadow-md)", fontSize: "12px" }} />
+                <Line type="monotone" dataKey="score" stroke="hsl(142 70% 45%)" strokeWidth={2.5} dot={{ fill: "hsl(142 70% 45%)", r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -219,27 +219,23 @@ const ProgressPage = () => {
           <div className="bg-card rounded-2xl shadow-card p-4">
             <p className="text-xs font-semibold text-success mb-2">Strong Subject</p>
             <p className="font-bold text-foreground">{strongSubject}</p>
-            <p className="text-xs text-muted-foreground mt-1">Best momentum from your journal</p>
+            <p className="text-xs text-muted-foreground mt-1">Best momentum in sample data</p>
           </div>
         </div>
 
         <div className="bg-card rounded-2xl shadow-card p-5">
           <h3 className="font-semibold text-foreground mb-3">Mood Analysis</h3>
-          {Object.keys(moodData).length > 0 ? (
-            <div className="space-y-2">
-              {Object.entries(moodData).map(([mood, count]) => (
-                <div key={mood} className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-muted-foreground w-20">{mood}</span>
-                  <div className="flex-1 h-2 bg-accent rounded-full overflow-hidden">
-                    <div className="h-full rounded-full gradient-primary" style={{ width: `${(count / Math.max(...Object.values(moodData))) * 100}%` }} />
-                  </div>
-                  <span className="text-xs font-semibold text-foreground w-6 text-right">{count}</span>
+          <div className="space-y-2">
+            {Object.entries(moodData).map(([mood, count]) => (
+              <div key={mood} className="flex items-center gap-3">
+                <span className="text-xs font-medium text-muted-foreground w-20">{mood}</span>
+                <div className="flex-1 h-2 bg-accent rounded-full overflow-hidden">
+                  <div className="h-full rounded-full gradient-primary" style={{ width: `${(count / Math.max(...Object.values(moodData))) * 100}%` }} />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No mood entries yet.</p>
-          )}
+                <span className="text-xs font-semibold text-foreground w-6 text-right">{count}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

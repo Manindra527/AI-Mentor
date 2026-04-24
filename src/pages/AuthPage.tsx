@@ -117,9 +117,10 @@ const AuthPage = ({ variant = "page", initialMode = null, onClose }: AuthPagePro
       return;
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
     setIsSubmitting(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
       password,
     });
     setIsSubmitting(false);
@@ -129,7 +130,8 @@ const AuthPage = ({ variant = "page", initialMode = null, onClose }: AuthPagePro
       return;
     }
 
-    toast.success("Welcome back.");
+    const signedInEmail = data.user?.email ?? normalizedEmail;
+    toast.success(`Welcome back, ${signedInEmail}.`);
   };
 
   const handleForgotPassword = async (event: FormEvent<HTMLFormElement>) => {

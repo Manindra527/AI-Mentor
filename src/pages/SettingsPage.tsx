@@ -1,17 +1,22 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import {
   Bell,
+  Camera,
   Calendar,
   ChevronLeft,
   ChevronRight,
   Clock3,
+  LockKeyhole,
   MoonStar,
+  Pencil,
+  Save,
   UserCircle2,
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useTheme } from "next-themes";
-import { useAppData } from "@/components/AppDataProvider";
+import { supabase } from "@/integrations/supabase/client";
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MENTOR_TIMES = ["6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM"];
@@ -108,73 +113,221 @@ const DetailLayout = ({
 );
 
 const SettingsPage = ({ onBack }: SettingsPageProps) => {
-  const { profile, saveProfile } = useAppData();
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [view, setView] = useState<SettingsView>("menu");
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileName, setProfileName] = useState("Study Warrior");
+  const [profilePhoto, setProfilePhoto] = useState("");
+  const [age, setAge] = useState("21");
+  const [email, setEmail] = useState("");
   const [targetExam, setTargetExam] = useState("UPSC CSE");
+  const [examDate, setExamDate] = useState("");
   const [dailyHoursGoal, setDailyHoursGoal] = useState("6");
+  const [weekStart, setWeekStart] = useState("Monday");
+  const [mentorDay, setMentorDay] = useState("Sunday");
+  const [mentorTime, setMentorTime] = useState("9:00 AM");
+  const [monthlyReviewDay, setMonthlyReviewDay] = useState("1");
+  const [dailyReminder, setDailyReminder] = useState(true);
+  const [sessionReminder, setSessionReminder] = useState(true);
+  const [mentorReminder, setMentorReminder] = useState(true);
+  const [streakReminder, setStreakReminder] = useState(false);
+
+  const monthlyReviewLabel =
+    MONTHLY_REVIEW_OPTIONS.find((option) => option.value === monthlyReviewDay)?.label ?? "Day 1";
+  const themeLabel = theme === "dark" ? "Dark" : "Light";
 
   useEffect(() => {
-    if (!profile) {
+    let isMounted = true;
+
+    const loadUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!isMounted) {
+        return;
+      }
+
+      setEmail(data.user?.email ?? "");
+    };
+
+    void loadUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleProfileEditToggle = () => {
+    if (isEditingProfile) {
+      toast.success("Profile changes saved.");
+    }
+    setIsEditingProfile((value) => !value);
+  };
+
+  const handleProfilePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
       return;
     }
 
-    setProfileName(profile.displayName);
-    setTargetExam(profile.targetExam);
-    setDailyHoursGoal(profile.availableHoursPerDay ? String(profile.availableHoursPerDay) : "");
-  }, [profile]);
+    const objectUrl = URL.createObjectURL(file);
+    setProfilePhoto(objectUrl);
+    toast.success("Profile photo updated.");
+  };
 
-  const weekStart = profile?.weekStart ?? "Monday";
-  const mentorDay = profile?.mentorDay ?? "Sunday";
-  const mentorTime = profile?.mentorTime ?? "9:00 AM";
-  const monthlyReviewDay = profile?.monthlyReviewDay ?? "1";
-  const dailyReminder = profile?.dailyReminder ?? true;
-  const sessionReminder = profile?.sessionReminder ?? true;
-  const mentorReminder = profile?.mentorReminder ?? true;
-  const streakReminder = profile?.streakReminder ?? false;
-  const themeLabel = profile?.theme === "dark" ? "Dark" : "Light";
-  const monthlyReviewLabel =
-    MONTHLY_REVIEW_OPTIONS.find((option) => option.value === monthlyReviewDay)?.label ?? "Day 1";
+  const handleProfilePhotoButtonClick = () => {
+    if (profilePhoto) {
+      URL.revokeObjectURL(profilePhoto);
+      setProfilePhoto("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      toast.success("Profile photo removed.");
+      return;
+    }
 
-  const saveTheme = async (nextTheme: "light" | "dark") => {
-    setTheme(nextTheme);
-    await saveProfile({ theme: nextTheme });
+    fileInputRef.current?.click();
   };
 
   if (view === "profile") {
     return (
       <DetailLayout title="Profile" onBack={() => setView("menu")}>
-        <div className="bg-card rounded-2xl shadow-card p-5 space-y-4">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Display Name</label>
-            <input
-              value={profileName}
-              onChange={(event) => setProfileName(event.target.value)}
-              onBlur={() => void saveProfile({ displayName: profileName.trim() || "Study Warrior" })}
-              className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
-              placeholder="Your name"
-            />
+        <div className="space-y-4">
+          <div className="bg-card rounded-2xl shadow-card p-5 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full border-2 border-border bg-accent overflow-hidden flex items-center justify-center">
+                  {profilePhoto ? (
+                    <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-2xl font-bold text-foreground">
+                      {profileName.trim().slice(0, 2).toUpperCase() || "AI"}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleProfilePhotoButtonClick}
+                  className="absolute -left-1 bottom-1 w-8 h-8 rounded-full bg-card border border-border shadow-card flex items-center justify-center text-primary hover:bg-accent transition-colors"
+                  aria-label={profilePhoto ? "Remove profile photo" : "Change profile photo"}
+                  title={profilePhoto ? "Remove profile photo" : "Change profile photo"}
+                >
+                  <Camera size={15} />
+                  {profilePhoto ? <span className="absolute w-5 h-0.5 rounded-full bg-destructive rotate-[-45deg]" /> : null}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleProfilePhotoChange}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleProfileEditToggle}
+                className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 gradient-primary text-primary-foreground font-semibold shadow-orange"
+              >
+                {isEditingProfile ? <Save size={16} /> : <Pencil size={16} />}
+                {isEditingProfile ? "Save" : "Edit"}
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Full Name</label>
+              <input
+                value={profileName}
+                onChange={(event) => setProfileName(event.target.value)}
+                readOnly={!isEditingProfile}
+                className={`mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm outline-none ${
+                  isEditingProfile
+                    ? "bg-background text-foreground focus:border-primary"
+                    : "bg-accent text-muted-foreground cursor-default"
+                }`}
+                placeholder="Your name"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Age</label>
+              <input
+                type="number"
+                min="1"
+                value={age}
+                onChange={(event) => setAge(event.target.value)}
+                readOnly={!isEditingProfile}
+                className={`mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm outline-none ${
+                  isEditingProfile
+                    ? "bg-background text-foreground focus:border-primary"
+                    : "bg-accent text-muted-foreground cursor-default"
+                }`}
+                placeholder="21"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Email</label>
+              <input
+                value={email}
+                readOnly
+                className="mt-2 w-full rounded-xl border border-border bg-accent px-4 py-3 text-sm text-muted-foreground outline-none"
+                placeholder="your-email@example.com"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Target Exam</label>
+              <input
+                value={targetExam}
+                onChange={(event) => setTargetExam(event.target.value)}
+                readOnly={!isEditingProfile}
+                className={`mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm outline-none ${
+                  isEditingProfile
+                    ? "bg-background text-foreground focus:border-primary"
+                    : "bg-accent text-muted-foreground cursor-default"
+                }`}
+                placeholder="NEET, JEE, UPSC..."
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Exam Date</label>
+              <input
+                type="date"
+                value={examDate}
+                onChange={(event) => setExamDate(event.target.value)}
+                readOnly={!isEditingProfile}
+                className={`mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm outline-none ${
+                  isEditingProfile
+                    ? "bg-background text-foreground focus:border-primary"
+                    : "bg-accent text-muted-foreground cursor-default"
+                }`}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Daily Study Goal (hours)</label>
+              <input
+                value={dailyHoursGoal}
+                onChange={(event) => setDailyHoursGoal(event.target.value)}
+                readOnly={!isEditingProfile}
+                className={`mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm outline-none ${
+                  isEditingProfile
+                    ? "bg-background text-foreground focus:border-primary"
+                    : "bg-accent text-muted-foreground cursor-default"
+                }`}
+                placeholder="6"
+              />
+            </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Target Exam</label>
-            <input
-              value={targetExam}
-              onChange={(event) => setTargetExam(event.target.value)}
-              onBlur={() => void saveProfile({ targetExam: targetExam.trim() || "UPSC CSE" })}
-              className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
-              placeholder="NEET, JEE, UPSC..."
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Daily Study Goal (hours)</label>
-            <input
-              value={dailyHoursGoal}
-              onChange={(event) => setDailyHoursGoal(event.target.value)}
-              onBlur={() => void saveProfile({ availableHoursPerDay: Number(dailyHoursGoal) || 0 })}
-              className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
-              placeholder="6"
-            />
+
+          <div className="bg-card rounded-2xl shadow-card p-5">
+            <button
+              type="button"
+              onClick={() => toast.message("We can wire the change-password logic next.")}
+              className="w-full flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3 text-left text-sm text-foreground hover:border-primary transition-colors"
+            >
+              <span className="inline-flex items-center gap-2 font-semibold">
+                <LockKeyhole size={16} className="text-primary" />
+                Change Password
+              </span>
+              <span className="text-xs text-muted-foreground">Set up later</span>
+            </button>
           </div>
         </div>
       </DetailLayout>
@@ -189,7 +342,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
             <label className="text-xs font-medium text-muted-foreground">Choose Theme</label>
             <select
               value={themeLabel}
-              onChange={(event) => void saveTheme(event.target.value.toLowerCase() as "light" | "dark")}
+              onChange={(event) => setTheme(event.target.value.toLowerCase())}
               className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
             >
               <option value="Light">Light</option>
@@ -211,7 +364,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
               <button
                 key={day}
                 type="button"
-                onClick={() => void saveProfile({ weekStart: day })}
+                onClick={() => setWeekStart(day)}
                 className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${
                   weekStart === day
                     ? "gradient-primary text-primary-foreground shadow-orange"
@@ -238,7 +391,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                 <button
                   key={day}
                   type="button"
-                  onClick={() => void saveProfile({ mentorDay: day })}
+                  onClick={() => setMentorDay(day)}
                   className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${
                     mentorDay === day
                       ? "gradient-primary text-primary-foreground shadow-orange"
@@ -258,7 +411,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                 <button
                   key={time}
                   type="button"
-                  onClick={() => void saveProfile({ mentorTime: time })}
+                  onClick={() => setMentorTime(time)}
                   className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${
                     mentorTime === time
                       ? "gradient-primary text-primary-foreground shadow-orange"
@@ -285,7 +438,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
               <button
                 key={option.value}
                 type="button"
-                onClick={() => void saveProfile({ monthlyReviewDay: option.value })}
+                onClick={() => setMonthlyReviewDay(option.value)}
                 className={`w-full py-3 rounded-xl text-sm font-medium transition-colors ${
                   monthlyReviewDay === option.value
                     ? "gradient-primary text-primary-foreground shadow-orange"
@@ -309,25 +462,25 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
             label="Daily study reminder"
             description="Get reminded to start your daily plan."
             value={dailyReminder}
-            onToggle={() => void saveProfile({ dailyReminder: !dailyReminder })}
+            onToggle={() => setDailyReminder((value) => !value)}
           />
           <Toggle
             label="Session start alerts"
             description="Notify before each planned session."
             value={sessionReminder}
-            onToggle={() => void saveProfile({ sessionReminder: !sessionReminder })}
+            onToggle={() => setSessionReminder((value) => !value)}
           />
           <Toggle
             label="Mentor session reminder"
             description="Remind before your weekly check-in and monthly review."
             value={mentorReminder}
-            onToggle={() => void saveProfile({ mentorReminder: !mentorReminder })}
+            onToggle={() => setMentorReminder((value) => !value)}
           />
           <Toggle
             label="Streak protection"
             description="Alert when your study streak is at risk."
             value={streakReminder}
-            onToggle={() => void saveProfile({ streakReminder: !streakReminder })}
+            onToggle={() => setStreakReminder((value) => !value)}
           />
         </div>
       </DetailLayout>

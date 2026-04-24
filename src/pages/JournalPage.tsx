@@ -1,31 +1,28 @@
 import { useState } from "react";
 import { BookOpen, Plus } from "lucide-react";
 import {
+  MOCK_JOURNAL_ENTRIES,
   MOOD_EMOJIS,
+  SAMPLE_ACTIVE_DATE,
   SESSION_TYPE_COLORS,
   SESSION_TYPE_LABELS,
-  type JournalEntry,
   type Mood,
-  type StressReason,
   type SessionType,
 } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useAppData } from "@/components/AppDataProvider";
-import { getTodayDateKey } from "@/lib/time";
-import { toast } from "sonner";
 
 const MOODS: Mood[] = ["focused", "distracted", "tired", "motivated", "frustrated", "stressed"];
 
-const STRESS_REASONS: { value: StressReason; label: string }[] = [
+const STRESS_REASONS = [
   { value: "topic-difficult", label: "Topic difficult" },
   { value: "too-many-questions", label: "Too many questions" },
   { value: "time-pressure", label: "Time pressure" },
   { value: "didnt-understand", label: "Didn't understand concept" },
   { value: "personal-distraction", label: "Personal distraction" },
-];
+] as const;
 
 const formatStressReason = (value?: string) =>
   value
@@ -36,68 +33,11 @@ const formatStressReason = (value?: string) =>
 const formatMoodLabel = (mood: Mood) => mood.charAt(0).toUpperCase() + mood.slice(1);
 
 const JournalPage = () => {
-  const { journalEntries, addJournalEntry } = useAppData();
   const [showNew, setShowNew] = useState(false);
   const [sessionType, setSessionType] = useState<SessionType>("concept");
   const [mood, setMood] = useState<Mood | null>(null);
-  const [subject, setSubject] = useState("");
-  const [topic, setTopic] = useState("");
-  const [duration, setDuration] = useState("60");
-  const [questionsAttempted, setQuestionsAttempted] = useState("");
-  const [correctAnswers, setCorrectAnswers] = useState("");
-  const [hardness, setHardness] = useState<JournalEntry["hardness"] | null>(null);
-  const [mistakes, setMistakes] = useState("");
-  const [notes, setNotes] = useState("");
-  const [stressReason, setStressReason] = useState<StressReason | null>(null);
 
-  const todayDate = getTodayDateKey();
-  const entries = journalEntries.filter((entry) => entry.date === todayDate);
-
-  const resetForm = () => {
-    setSessionType("concept");
-    setMood(null);
-    setSubject("");
-    setTopic("");
-    setDuration("60");
-    setQuestionsAttempted("");
-    setCorrectAnswers("");
-    setHardness(null);
-    setMistakes("");
-    setNotes("");
-    setStressReason(null);
-  };
-
-  const handleSave = async () => {
-    if (!subject.trim() || !topic.trim() || !mood) {
-      toast.error("Please add subject, topic, and mood.");
-      return;
-    }
-
-    const nextEntry: JournalEntry = {
-      id: crypto.randomUUID(),
-      date: todayDate,
-      sessionType,
-      subject: subject.trim(),
-      topic: topic.trim(),
-      duration: Math.max(15, Number(duration) || 60),
-      mood,
-      stressReason: mood === "stressed" ? stressReason ?? undefined : undefined,
-      notes: notes.trim() || undefined,
-      questionsAttempted: questionsAttempted ? Number(questionsAttempted) : undefined,
-      correctAnswers: correctAnswers ? Number(correctAnswers) : undefined,
-      hardness: hardness ?? undefined,
-      mistakes: mistakes.trim() || undefined,
-    };
-
-    const saved = await addJournalEntry(nextEntry);
-    if (!saved) {
-      return;
-    }
-
-    resetForm();
-    setShowNew(false);
-    toast.success("Journal entry saved.");
-  };
+  const entries = MOCK_JOURNAL_ENTRIES.filter((entry) => entry.date === SAMPLE_ACTIVE_DATE);
 
   return (
     <div className="h-full min-h-0 flex flex-col">
@@ -105,15 +45,7 @@ const JournalPage = () => {
         <h1 className="text-2xl font-bold text-foreground">Daily Journal</h1>
       </div>
 
-      <Dialog
-        open={showNew}
-        onOpenChange={(open) => {
-          setShowNew(open);
-          if (!open) {
-            resetForm();
-          }
-        }}
-      >
+      <Dialog open={showNew} onOpenChange={setShowNew}>
         <DialogContent className="max-w-sm rounded-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New Journal Entry</DialogTitle>
@@ -139,17 +71,17 @@ const JournalPage = () => {
 
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Subject</label>
-              <Input value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="e.g., Quantitative Aptitude" className="rounded-xl" />
+              <Input placeholder="e.g., Quantitative Aptitude" className="rounded-xl" />
             </div>
 
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Topic</label>
-              <Input value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="e.g., Permutations" className="rounded-xl" />
+              <Input placeholder="e.g., Permutations" className="rounded-xl" />
             </div>
 
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Duration (minutes)</label>
-              <Input type="number" value={duration} onChange={(event) => setDuration(event.target.value)} placeholder="60" className="rounded-xl" />
+              <Input type="number" placeholder="60" className="rounded-xl" />
             </div>
 
             {(sessionType === "practice" || sessionType === "mock") && (
@@ -157,40 +89,36 @@ const JournalPage = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-foreground block mb-1">Questions</label>
-                    <Input type="number" value={questionsAttempted} onChange={(event) => setQuestionsAttempted(event.target.value)} placeholder="30" className="rounded-xl" />
+                    <Input type="number" placeholder="30" className="rounded-xl" />
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-foreground block mb-1">Correct</label>
-                    <Input type="number" value={correctAnswers} onChange={(event) => setCorrectAnswers(event.target.value)} placeholder="24" className="rounded-xl" />
+                    <Input type="number" placeholder="24" className="rounded-xl" />
                   </div>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-2">Difficulty</label>
                   <div className="flex gap-2">
-                    {(["easy", "medium", "hard", "mixed"] as const).map((item) => (
+                    {["Easy", "Medium", "Hard", "Mixed"].map((hardness) => (
                       <button
-                        key={item}
-                        onClick={() => setHardness(item)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors capitalize",
-                          hardness === item ? "gradient-primary text-white" : "bg-accent text-accent-foreground hover:bg-primary/10",
-                        )}
+                        key={hardness}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent text-accent-foreground hover:bg-primary/10 transition-colors"
                       >
-                        {item}
+                        {hardness}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1">Key Mistakes</label>
-                  <Textarea value={mistakes} onChange={(event) => setMistakes(event.target.value)} placeholder="What went wrong?" className="rounded-xl" rows={2} />
+                  <Textarea placeholder="What went wrong?" className="rounded-xl" rows={2} />
                 </div>
               </>
             )}
 
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Notes</label>
-              <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Any observations..." className="rounded-xl" rows={2} />
+              <Textarea placeholder="Any observations..." className="rounded-xl" rows={2} />
             </div>
 
             <div>
@@ -219,13 +147,7 @@ const JournalPage = () => {
                   {STRESS_REASONS.map((reason) => (
                     <button
                       key={reason.value}
-                      onClick={() => setStressReason(reason.value)}
-                      className={cn(
-                        "w-full rounded-xl p-3 text-xs font-medium text-left transition-colors",
-                        stressReason === reason.value
-                          ? "bg-destructive text-destructive-foreground"
-                          : "bg-destructive/5 text-destructive hover:bg-destructive/10",
-                      )}
+                      className="w-full rounded-xl p-3 bg-destructive/5 text-destructive text-xs font-medium text-left hover:bg-destructive/10 transition-colors"
                     >
                       {reason.label}
                     </button>
@@ -234,7 +156,10 @@ const JournalPage = () => {
               </div>
             )}
 
-            <button onClick={handleSave} className="w-full gradient-primary text-white rounded-xl p-3 font-semibold text-sm">
+            <button
+              onClick={() => setShowNew(false)}
+              className="w-full gradient-primary text-white rounded-xl p-3 font-semibold text-sm"
+            >
               Save Entry
             </button>
           </div>
@@ -248,46 +173,43 @@ const JournalPage = () => {
             Today&apos;s Entries
           </h3>
           <div className="space-y-3">
-            {entries.length > 0 ? (
-              entries.map((entry) => (
-                <div key={entry.id} className="bg-card rounded-2xl shadow-card p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        {entry.subject} - {entry.topic}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {entry.duration} min · {SESSION_TYPE_LABELS[entry.sessionType]}
-                      </p>
-                    </div>
-                    <span className="text-sm">{MOOD_EMOJIS[entry.mood]}</span>
+            {entries.map((entry) => (
+              <div key={entry.id} className="bg-card rounded-2xl shadow-card p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {entry.subject} - {entry.topic}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {entry.duration} min <span aria-hidden="true">&middot;</span> {SESSION_TYPE_LABELS[entry.sessionType]}
+                    </p>
                   </div>
-                  {entry.questionsAttempted && entry.correctAnswers !== undefined && (
-                    <div className="flex gap-4 mt-3 text-xs">
-                      <span className="text-muted-foreground">
-                        Attempted: <span className="font-semibold text-foreground">{entry.questionsAttempted}</span>
-                      </span>
-                      <span className="text-muted-foreground">
-                        Correct: <span className="font-semibold text-success">{entry.correctAnswers}</span>
-                      </span>
-                      <span className="text-muted-foreground">
-                        Accuracy: <span className="font-semibold text-primary">{Math.round((entry.correctAnswers / entry.questionsAttempted) * 100)}%</span>
-                      </span>
-                    </div>
-                  )}
-                  {entry.stressReason && (
-                    <p className="text-xs text-destructive mt-2">Stress reason: {formatStressReason(entry.stressReason)}</p>
-                  )}
-                  {entry.notes && (
-                    <p className="text-xs text-muted-foreground mt-2 italic">"{entry.notes}"</p>
-                  )}
+                  <span className="text-sm">{MOOD_EMOJIS[entry.mood]}</span>
                 </div>
-              ))
-            ) : (
-              <div className="bg-card rounded-2xl shadow-card p-6 text-sm text-muted-foreground">
-                No journal entries for today yet.
+                {entry.questionsAttempted && entry.correctAnswers !== undefined && (
+                  <div className="flex gap-4 mt-3 text-xs">
+                    <span className="text-muted-foreground">
+                      Attempted: <span className="font-semibold text-foreground">{entry.questionsAttempted}</span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Correct: <span className="font-semibold text-success">{entry.correctAnswers}</span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Accuracy:{" "}
+                      <span className="font-semibold text-primary">
+                        {Math.round((entry.correctAnswers / entry.questionsAttempted) * 100)}%
+                      </span>
+                    </span>
+                  </div>
+                )}
+                {entry.stressReason && (
+                  <p className="text-xs text-destructive mt-2">Stress reason: {formatStressReason(entry.stressReason)}</p>
+                )}
+                {entry.notes && (
+                  <p className="text-xs text-muted-foreground mt-2 italic">"{entry.notes}"</p>
+                )}
               </div>
-            )}
+            ))}
           </div>
         </div>
       </div>
