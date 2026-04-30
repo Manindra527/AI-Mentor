@@ -331,19 +331,22 @@ const shiftPlanForwardForHoliday = (
 };
 
 const generateInitialPlan = (setup: PlannerSetup) => {
+  return generatePlanFromDate(setup, TODAY_DATE_KEY, 7);
+};
+
+const generatePlanFromDate = (setup: PlannerSetup, startDate: string, minimumDays = 1) => {
   const subjects = setup.subjects.filter((subject) => subject.trim().length > 0);
   const hoursPerDay = Math.max(1, Number(setup.availableHoursPerDay) || 1);
   const totalDailyMinutes = Math.max(60, Math.round(hoursPerDay * 60));
   const rotationMode = subjects.length > hoursPerDay;
-  const startDate = TODAY_DATE_KEY;
   const sessionProgress: Record<string, number> = {};
 
   const daysUntilExam = Math.max(
-    7,
+    minimumDays,
     (Math.ceil(
       (new Date(`${setup.examDate}T00:00:00`).getTime() - new Date(`${startDate}T00:00:00`).getTime()) /
         (1000 * 60 * 60 * 24),
-    ) || 6) + 1,
+    ) || minimumDays - 1) + 1,
   );
 
   const plan: Record<string, TimeBlock[]> = {};
@@ -412,6 +415,10 @@ const PlannerPage = () => {
   const [showHoliday, setShowHoliday] = useState(false);
   const [showHolidayAdjustment, setShowHolidayAdjustment] = useState(false);
   const [holidayReason, setHolidayReason] = useState("");
+  const [showChangePlanner, setShowChangePlanner] = useState(false);
+  const [changeExamDate, setChangeExamDate] = useState("");
+  const [changeHours, setChangeHours] = useState("2");
+  const [changeSubjectInputs, setChangeSubjectInputs] = useState([""]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createSubject, setCreateSubject] = useState("");
   const [createTopic, setCreateTopic] = useState("");
@@ -628,6 +635,29 @@ const PlannerPage = () => {
     setSubjectInputs((previous) => (previous.length === 1 ? previous : previous.filter((_, currentIndex) => currentIndex !== index)));
   };
 
+  const openChangePlannerDialog = () => {
+    if (!plannerSetup) {
+      return;
+    }
+
+    setChangeExamDate(plannerSetup.examDate);
+    setChangeHours(String(plannerSetup.availableHoursPerDay));
+    setChangeSubjectInputs(plannerSetup.subjects.length > 0 ? plannerSetup.subjects : [""]);
+    setShowChangePlanner(true);
+  };
+
+  const handleAddChangeSubjectInput = () => {
+    setChangeSubjectInputs((previous) => [...previous, ""]);
+  };
+
+  const handleUpdateChangeSubjectInput = (index: number, value: string) => {
+    setChangeSubjectInputs((previous) => previous.map((subject, currentIndex) => (currentIndex === index ? value : subject)));
+  };
+
+  const handleRemoveChangeSubjectInput = (index: number) => {
+    setChangeSubjectInputs((previous) => (previous.length === 1 ? previous : previous.filter((_, currentIndex) => currentIndex !== index)));
+  };
+
   const startHistoryControlsWindow = () => {
     if (historyControlsTimeoutRef.current) {
       window.clearTimeout(historyControlsTimeoutRef.current);
@@ -760,6 +790,43 @@ const PlannerPage = () => {
     );
     setShowHolidayAdjustment(false);
     setHolidayReason("");
+  };
+
+  const handleChangePlannerFromSelectedDay = () => {
+    if (!plannerSetup) {
+      return;
+    }
+
+    const subjects = changeSubjectInputs.map((subject) => subject.trim()).filter(Boolean);
+    const nextHours = Number(changeHours);
+
+    if (!changeExamDate || !Number.isFinite(nextHours) || nextHours <= 0 || subjects.length === 0) {
+      toast.error("Please fill exam date, hours, and at least one subject.");
+      return;
+    }
+
+    if (changeExamDate < selectedDate) {
+      toast.error("Exam date must be on or after the selected day.");
+      return;
+    }
+
+    const nextSetup: PlannerSetup = {
+      ...plannerSetup,
+      examDate: changeExamDate,
+      availableHoursPerDay: nextHours,
+      subjects,
+    };
+    const regeneratedPlan = generatePlanFromDate(nextSetup, selectedDate);
+
+    commitPlanChange(
+      (previous) => ({
+        ...Object.fromEntries(Object.entries(previous).filter(([date]) => date < selectedDate)),
+        ...regeneratedPlan,
+      }),
+      `Planner changed from ${selectedDate}. Past days are unchanged.`,
+    );
+    setPlannerSetup(nextSetup);
+    setShowChangePlanner(false);
   };
 
   const handleUndo = () => {
@@ -915,15 +982,26 @@ const PlannerPage = () => {
         <div className="sticky top-0 z-10 bg-background pb-4 space-y-5 flex-shrink-0">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-foreground">Study Planner</h1>
-            <button
-              type="button"
-              onClick={() => setShowHoliday(true)}
-              className="w-10 h-10 rounded-full bg-accent text-primary flex items-center justify-center hover:bg-primary/10 transition-colors"
-              aria-label="Mark selected day as holiday"
-              title="Mark selected day as holiday"
-            >
-              <Palmtree size={16} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={openChangePlannerDialog}
+                className="w-10 h-10 rounded-full bg-accent text-primary flex items-center justify-center hover:bg-primary/10 transition-colors"
+                aria-label="Change planner from selected day"
+                title="Change planner from selected day"
+              >
+                <CalendarClock size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowHoliday(true)}
+                className="w-10 h-10 rounded-full bg-accent text-primary flex items-center justify-center hover:bg-primary/10 transition-colors"
+                aria-label="Mark selected day as holiday"
+                title="Mark selected day as holiday"
+              >
+                <Palmtree size={16} />
+              </button>
+            </div>
           </div>
 
           <div className="bg-card rounded-2xl shadow-card p-4 space-y-3">
@@ -1088,6 +1166,78 @@ const PlannerPage = () => {
             </div>
           </div>
         </div>
+
+        <Dialog open={showChangePlanner} onOpenChange={setShowChangePlanner}>
+          <DialogContent className="max-w-sm rounded-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Change Planner</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="rounded-xl bg-accent p-3 text-sm text-muted-foreground">
+                Changes will start from <span className="font-semibold text-foreground">{selectedDate}</span>. Earlier days will stay the same.
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1.5">Exam Date</label>
+                <Input
+                  type="date"
+                  value={changeExamDate}
+                  min={selectedDate}
+                  onChange={(event) => setChangeExamDate(event.target.value)}
+                  className="rounded-xl h-11"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1.5">Available Hours / Day</label>
+                <Input
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={changeHours}
+                  onChange={(event) => setChangeHours(event.target.value)}
+                  className="rounded-xl h-11"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground">Subjects</label>
+                  <button type="button" onClick={handleAddChangeSubjectInput} className="text-xs font-semibold text-primary">
+                    + Add Subject
+                  </button>
+                </div>
+
+                {changeSubjectInputs.map((subject, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={subject}
+                      onChange={(event) => handleUpdateChangeSubjectInput(index, event.target.value)}
+                      placeholder={`Subject ${index + 1}`}
+                      className="rounded-xl h-11"
+                    />
+                    {changeSubjectInputs.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveChangeSubjectInput(index)}
+                        className="rounded-xl px-3 py-2.5 text-xs font-semibold bg-accent text-muted-foreground hover:text-foreground"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={handleChangePlannerFromSelectedDay}
+                className="w-full gradient-primary text-white rounded-xl p-3 font-semibold text-sm"
+              >
+                Change From This Day
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogContent className="max-w-sm rounded-2xl max-h-[85vh] overflow-y-auto">
