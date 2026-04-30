@@ -42,6 +42,7 @@ const PLANNER_SETUP_KEY = "ai-mentor-planner-setup";
 const PLANNER_PLAN_KEY = "ai-mentor-plan-data";
 const PLANNER_SETUP_METADATA_KEY = "ai_mentor_planner_setup";
 const PLANNER_PLAN_METADATA_KEY = "ai_mentor_planner_plan";
+const HISTORY_CONTROLS_WINDOW_MS = 60 * 1000;
 const TIME_HOUR_OPTIONS = Array.from({ length: 12 }, (_, index) => String(index + 1));
 const TIME_MINUTE_OPTIONS = Array.from({ length: 60 }, (_, index) => index.toString().padStart(2, "0"));
 const DURATION_HOUR_OPTIONS = Array.from({ length: 13 }, (_, index) => String(index));
@@ -424,8 +425,10 @@ const PlannerPage = () => {
   const [postponeDurationMinutes, setPostponeDurationMinutes] = useState("60");
   const plannerMetadataRef = useRef<Record<string, unknown>>({});
   const lastSavedSnapshotRef = useRef("");
+  const historyControlsTimeoutRef = useRef<number | null>(null);
   const [undoStack, setUndoStack] = useState<Record<string, TimeBlock[]>[]>([]);
   const [redoStack, setRedoStack] = useState<Record<string, TimeBlock[]>[]>([]);
+  const [historyControlsAvailable, setHistoryControlsAvailable] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -553,10 +556,20 @@ const PlannerPage = () => {
     }
   }, [plannerSetup, planData]);
 
+  useEffect(() => {
+    return () => {
+      if (historyControlsTimeoutRef.current) {
+        window.clearTimeout(historyControlsTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const weekDates = useMemo(() => getWeekDates(calendarDate), [calendarDate]);
   const blocks = planData[selectedDate] || [];
   const headerDate = new Date(`${calendarDate}T00:00:00`);
   const rotationEnabled = plannerSetup ? plannerSetup.subjects.length > plannerSetup.availableHoursPerDay : false;
+  const canUndo = historyControlsAvailable && undoStack.length > 0;
+  const canRedo = historyControlsAvailable && redoStack.length > 0;
 
   if (isPlannerLoading) {
     return (
@@ -615,6 +628,17 @@ const PlannerPage = () => {
     setSubjectInputs((previous) => (previous.length === 1 ? previous : previous.filter((_, currentIndex) => currentIndex !== index)));
   };
 
+  const startHistoryControlsWindow = () => {
+    if (historyControlsTimeoutRef.current) {
+      window.clearTimeout(historyControlsTimeoutRef.current);
+    }
+
+    setHistoryControlsAvailable(true);
+    historyControlsTimeoutRef.current = window.setTimeout(() => {
+      setHistoryControlsAvailable(false);
+    }, HISTORY_CONTROLS_WINDOW_MS);
+  };
+
   const commitPlanChange = (
     updater: (previous: Record<string, TimeBlock[]>) => Record<string, TimeBlock[]>,
     successMessage?: string,
@@ -624,6 +648,7 @@ const PlannerPage = () => {
       if (JSON.stringify(previous) !== JSON.stringify(nextPlan)) {
         setUndoStack((history) => [...history, previous]);
         setRedoStack([]);
+        startHistoryControlsWindow();
       }
       return nextPlan;
     });
@@ -1261,7 +1286,7 @@ const PlannerPage = () => {
       <div className="fixed bottom-40 right-5 flex flex-col gap-3 z-30">
         <button
           onClick={handleUndo}
-          disabled={undoStack.length === 0}
+          disabled={!canUndo}
           className="w-12 h-12 rounded-full bg-card text-foreground shadow-card flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
           aria-label="Undo planner change"
           title="Undo"
@@ -1270,7 +1295,7 @@ const PlannerPage = () => {
         </button>
         <button
           onClick={handleRedo}
-          disabled={redoStack.length === 0}
+          disabled={!canRedo}
           className="w-12 h-12 rounded-full bg-card text-foreground shadow-card flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
           aria-label="Redo planner change"
           title="Redo"
