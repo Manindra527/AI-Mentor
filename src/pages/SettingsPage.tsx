@@ -20,6 +20,16 @@ import {
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MENTOR_TIMES = ["6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM"];
@@ -139,6 +149,8 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
   const [sessionReminder, setSessionReminder] = useState(true);
   const [mentorReminder, setMentorReminder] = useState(true);
   const [streakReminder, setStreakReminder] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
 
   const monthlyReviewLabel =
     MONTHLY_REVIEW_OPTIONS.find((option) => option.value === monthlyReviewDay)?.label ?? "Day 1";
@@ -196,11 +208,6 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
   };
 
   const handleResetData = async () => {
-    const shouldReset = window.confirm("Reset your study data? This removes saved planner data from this device and your profile.");
-    if (!shouldReset) {
-      return;
-    }
-
     localStorage.removeItem(PLANNER_SETUP_KEY);
     localStorage.removeItem(PLANNER_PLAN_KEY);
 
@@ -219,11 +226,12 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
     }
 
     toast.success("Study data reset.");
+    setShowResetDialog(false);
     setView("menu");
   };
 
   const handleDeleteAccount = () => {
-    toast.message("Account deletion needs a secure server function. Reset data is ready now.");
+    setShowDeleteAccountDialog(true);
   };
 
   const handleLogout = async () => {
@@ -542,7 +550,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
         <div className="space-y-3">
           <button
             type="button"
-            onClick={handleResetData}
+            onClick={() => setShowResetDialog(true)}
             className="w-full flex items-center gap-3 p-4 rounded-2xl bg-card shadow-card text-left transition-colors hover:bg-accent"
           >
             <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
@@ -553,6 +561,29 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
               <p className="text-xs text-muted-foreground">Delete saved study and planner data</p>
             </div>
           </button>
+
+          <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+            <AlertDialogContent className="w-[calc(100%-2rem)] rounded-2xl border-border">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Reset study data?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will delete saved planner data from this device and your profile. Your account will stay active.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleResetData();
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Reset Data
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <button
             type="button"
@@ -567,6 +598,21 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
               <p className="text-xs text-muted-foreground">Permanently remove your account</p>
             </div>
           </button>
+
+          <AlertDialog open={showDeleteAccountDialog} onOpenChange={setShowDeleteAccountDialog}>
+            <AlertDialogContent className="w-[calc(100%-2rem)] rounded-2xl border-border">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete account</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Account deletion needs a secure backend function before it can permanently remove your Supabase user.
+                  For now, use Reset Data to clear your study data.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setShowDeleteAccountDialog(false)}>Okay</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </DetailLayout>
     );
