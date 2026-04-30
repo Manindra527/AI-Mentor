@@ -6,10 +6,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  LogOut,
   LockKeyhole,
   MoonStar,
   Pencil,
+  RotateCcw,
   Save,
+  Trash2,
   UserCircle2,
   Users,
   type LucideIcon,
@@ -25,8 +28,12 @@ const MONTHLY_REVIEW_OPTIONS = [
   { value: "15", label: "Day 15" },
   { value: "Last", label: "Last Day" },
 ] as const;
+const PLANNER_SETUP_KEY = "ai-mentor-planner-setup";
+const PLANNER_PLAN_KEY = "ai-mentor-plan-data";
+const PLANNER_SETUP_METADATA_KEY = "ai_mentor_planner_setup";
+const PLANNER_PLAN_METADATA_KEY = "ai_mentor_planner_plan";
 
-type SettingsView = "menu" | "profile" | "theme" | "weekStart" | "mentorMeeting" | "monthlyReview" | "notifications";
+type SettingsView = "menu" | "profile" | "theme" | "weekStart" | "mentorMeeting" | "monthlyReview" | "notifications" | "moreOptions";
 
 interface SettingsPageProps {
   onBack: () => void;
@@ -186,6 +193,48 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
     }
 
     fileInputRef.current?.click();
+  };
+
+  const handleResetData = async () => {
+    const shouldReset = window.confirm("Reset your study data? This removes saved planner data from this device and your profile.");
+    if (!shouldReset) {
+      return;
+    }
+
+    localStorage.removeItem(PLANNER_SETUP_KEY);
+    localStorage.removeItem(PLANNER_PLAN_KEY);
+
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data.user) {
+      const metadata = (data.user.user_metadata ?? {}) as Record<string, unknown>;
+      const nextMetadata = { ...metadata };
+      delete nextMetadata[PLANNER_SETUP_METADATA_KEY];
+      delete nextMetadata[PLANNER_PLAN_METADATA_KEY];
+
+      const { error: saveError } = await supabase.auth.updateUser({ data: nextMetadata });
+      if (saveError) {
+        toast.error("Local data was reset, but account sync could not be updated.");
+        return;
+      }
+    }
+
+    toast.success("Study data reset.");
+    setView("menu");
+  };
+
+  const handleDeleteAccount = () => {
+    toast.message("Account deletion needs a secure server function. Reset data is ready now.");
+  };
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error("Could not log out. Please try again.");
+      return;
+    }
+
+    toast.success("Logged out.");
+    onBack();
   };
 
   if (view === "profile") {
@@ -487,8 +536,44 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
     );
   }
 
+  if (view === "moreOptions") {
+    return (
+      <DetailLayout title="More Options" onBack={() => setView("menu")}>
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={handleResetData}
+            className="w-full flex items-center gap-3 p-4 rounded-2xl bg-card shadow-card text-left transition-colors hover:bg-accent"
+          >
+            <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <RotateCcw size={18} className="text-destructive" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">Reset Data</p>
+              <p className="text-xs text-muted-foreground">Delete saved study and planner data</p>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDeleteAccount}
+            className="w-full flex items-center gap-3 p-4 rounded-2xl bg-card shadow-card text-left transition-colors hover:bg-destructive/10"
+          >
+            <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <Trash2 size={18} className="text-destructive" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-destructive">Delete Account</p>
+              <p className="text-xs text-muted-foreground">Permanently remove your account</p>
+            </div>
+          </button>
+        </div>
+      </DetailLayout>
+    );
+  }
+
   return (
-    <div className="space-y-5 pb-4">
+    <div className="min-h-full flex flex-col pb-4">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -501,7 +586,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3 mt-5 flex-1">
         <SettingsItem
           icon={UserCircle2}
           label="Profile"
@@ -538,6 +623,23 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
           value="Daily reminders, session alerts, mentor reminders"
           onClick={() => setView("notifications")}
         />
+        <SettingsItem
+          icon={Trash2}
+          label="Delete"
+          value="Reset data or delete your account"
+          onClick={() => setView("moreOptions")}
+        />
+      </div>
+
+      <div className="flex justify-center mt-8 mb-8">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground shadow-card transition-colors hover:bg-accent"
+        >
+          <LogOut size={17} />
+          Logout
+        </button>
       </div>
     </div>
   );
