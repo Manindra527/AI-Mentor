@@ -45,15 +45,13 @@ describe("PlannerPage undo and redo controls", () => {
     vi.useRealTimers();
   });
 
-  it("enables undo briefly after planner changes and disables it after one minute", async () => {
+  it("shows undo and redo briefly after planner changes and hides them after one minute", async () => {
     render(<PlannerPage />);
 
     expect(await screen.findByText("Original Topic")).toBeInTheDocument();
 
-    const undoButton = screen.getByTitle("Undo");
-    const redoButton = screen.getByTitle("Redo");
-    expect(undoButton).toBeDisabled();
-    expect(redoButton).toBeDisabled();
+    expect(screen.queryByTitle("Undo")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Redo")).not.toBeInTheDocument();
 
     const sessionCard = screen.getByText("Original Topic").closest(".bg-card");
     expect(sessionCard).not.toBeNull();
@@ -68,6 +66,8 @@ describe("PlannerPage undo and redo controls", () => {
     fireEvent.click(screen.getByText("Save Changes"));
 
     expect(screen.getByText("Updated Topic")).toBeInTheDocument();
+    const undoButton = screen.getByTitle("Undo");
+    const redoButton = screen.getByTitle("Redo");
     expect(undoButton).not.toBeDisabled();
     expect(redoButton).toBeDisabled();
 
@@ -75,7 +75,7 @@ describe("PlannerPage undo and redo controls", () => {
       vi.advanceTimersByTime(60_001);
     });
 
-    expect(undoButton).toBeDisabled();
-    expect(redoButton).toBeDisabled();
+    expect(screen.queryByTitle("Undo")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Redo")).not.toBeInTheDocument();
   });
 });

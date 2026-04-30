@@ -1283,26 +1283,28 @@ const PlannerPage = () => {
         </DialogContent>
       </Dialog>
 
-      <div className="fixed bottom-40 right-5 flex flex-col gap-3 z-30">
-        <button
-          onClick={handleUndo}
-          disabled={!canUndo}
-          className="w-12 h-12 rounded-full bg-card text-foreground shadow-card flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
-          aria-label="Undo planner change"
-          title="Undo"
-        >
-          <RotateCcw size={18} />
-        </button>
-        <button
-          onClick={handleRedo}
-          disabled={!canRedo}
-          className="w-12 h-12 rounded-full bg-card text-foreground shadow-card flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
-          aria-label="Redo planner change"
-          title="Redo"
-        >
-          <RotateCw size={18} />
-        </button>
-      </div>
+      {historyControlsAvailable ? (
+        <div className="fixed bottom-40 right-5 flex flex-col gap-3 z-30">
+          <button
+            onClick={handleUndo}
+            disabled={!canUndo}
+            className="w-12 h-12 rounded-full bg-card text-foreground shadow-card flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Undo planner change"
+            title="Undo"
+          >
+            <RotateCcw size={18} />
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={!canRedo}
+            className="w-12 h-12 rounded-full bg-card text-foreground shadow-card flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Redo planner change"
+            title="Redo"
+          >
+            <RotateCw size={18} />
+          </button>
+        </div>
+      ) : null}
       <button
         onClick={() => setShowCreateDialog(true)}
         className="fixed bottom-24 right-5 w-14 h-14 gradient-primary text-primary-foreground rounded-full shadow-orange flex items-center justify-center active:scale-90 transition-transform z-30"
