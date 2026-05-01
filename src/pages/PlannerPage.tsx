@@ -883,7 +883,7 @@ const PlannerPage = () => {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar pb-28">
-          <div className="bg-card rounded-3xl shadow-card-lg p-4 sm:p-6 space-y-5">
+          <div className="bg-card rounded-3xl shadow-card-lg p-6 space-y-5">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Planner Setup</p>
               <h2 className="text-2xl font-bold text-foreground mt-2">Tell us your exam goal first</h2>
@@ -908,7 +908,7 @@ const PlannerPage = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1.5">Exam Date</label>
                   <Input type="date" value={setupExamDate} onChange={(event) => setSetupExamDate(event.target.value)} className="rounded-xl h-11" />
@@ -928,7 +928,7 @@ const PlannerPage = () => {
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-foreground">Subjects</label>
                   <button type="button" onClick={handleAddSubjectInput} className="text-xs font-semibold text-primary">
                     + Add Subject
@@ -936,18 +936,18 @@ const PlannerPage = () => {
                 </div>
 
                 {subjectInputs.map((subject, index) => (
-                  <div key={index} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div key={index} className="flex items-center gap-2">
                     <Input
                       value={subject}
                       onChange={(event) => handleUpdateSubjectInput(index, event.target.value)}
                       placeholder={`Subject ${index + 1}`}
-                      className="w-full rounded-xl h-11"
+                      className="rounded-xl h-11"
                     />
                     {subjectInputs.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveSubjectInput(index)}
-                        className="w-full rounded-xl px-3 py-2.5 text-xs font-semibold bg-accent text-muted-foreground hover:text-foreground sm:w-auto"
+                        className="rounded-xl px-3 py-2.5 text-xs font-semibold bg-accent text-muted-foreground hover:text-foreground"
                       >
                         Remove
                       </button>
@@ -979,10 +979,10 @@ const PlannerPage = () => {
   return (
     <>
       <div className="h-full min-h-0 flex flex-col">
-        <div className="sticky top-0 z-10 bg-background pb-4 space-y-4 sm:space-y-5 flex-shrink-0">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="sticky top-0 z-10 bg-background pb-4 space-y-5 flex-shrink-0">
+          <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-foreground">Study Planner</h1>
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={openChangePlannerDialog}
@@ -1004,13 +1004,13 @@ const PlannerPage = () => {
             </div>
           </div>
 
-          <div className="bg-card rounded-2xl shadow-card p-4 sm:p-5 space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="bg-card rounded-2xl shadow-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">{plannerSetup.targetExam}</p>
                 <p className="text-sm text-muted-foreground mt-1">Exam date: {plannerSetup.examDate}</p>
               </div>
-              <div className="text-left sm:text-right">
+              <div className="text-right">
                 <p className="text-sm font-semibold text-foreground">{plannerSetup.availableHoursPerDay} hrs/day</p>
                 <p className="text-xs text-muted-foreground">{plannerSetup.subjects.length} subjects</p>
               </div>
@@ -1037,49 +1037,47 @@ const PlannerPage = () => {
                 <ChevronRight size={18} />
               </button>
             </div>
-            <div className="-mx-1 overflow-x-auto px-1 sm:mx-0 sm:px-0">
-              <div className="grid min-w-[420px] grid-cols-7 gap-2 sm:min-w-0">
-                {weekDates.map((date) => {
-                  const dateKey = formatDateKey(date);
-                  const isSelected = dateKey === selectedDate;
-                  const hasBlocks = (planData[dateKey] || []).length > 0;
+            <div className="flex justify-between gap-1">
+              {weekDates.map((date) => {
+                const dateKey = formatDateKey(date);
+                const isSelected = dateKey === selectedDate;
+                const hasBlocks = (planData[dateKey] || []).length > 0;
 
-                  return (
-                    <button
-                      key={dateKey}
-                      onClick={() => {
-                        setSelectedDate(dateKey);
-                        setCalendarDate(dateKey);
-                      }}
-                      className="flex min-w-[52px] flex-col items-center gap-1"
+                return (
+                  <button
+                    key={dateKey}
+                    onClick={() => {
+                      setSelectedDate(dateKey);
+                      setCalendarDate(dateKey);
+                    }}
+                    className="flex flex-col items-center gap-1 flex-1"
+                  >
+                    <span className="text-[10px] text-muted-foreground font-medium">
+                      {date.toLocaleDateString("en-US", { weekday: "short" })}
+                    </span>
+                    <span
+                      className={`w-9 h-9 flex items-center justify-center rounded-xl text-sm font-semibold transition-colors ${
+                        isSelected
+                          ? "gradient-primary text-primary-foreground shadow-orange"
+                          : "text-foreground hover:bg-accent"
+                      }`}
                     >
-                      <span className="text-[10px] text-muted-foreground font-medium">
-                        {date.toLocaleDateString("en-US", { weekday: "short" })}
-                      </span>
-                      <span
-                        className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-semibold transition-colors ${
-                          isSelected
-                            ? "gradient-primary text-primary-foreground shadow-orange"
-                            : "text-foreground hover:bg-accent"
-                        }`}
-                      >
-                        {date.getDate()}
-                      </span>
-                      {hasBlocks && !isSelected ? (
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary mt-0.5" />
-                      ) : (
-                        <div className="w-1.5 h-1.5 mt-0.5" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+                      {date.getDate()}
+                    </span>
+                    {hasBlocks && !isSelected ? (
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary mt-0.5" />
+                    ) : (
+                      <div className="w-1.5 h-1.5 mt-0.5" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar space-y-4 pb-28">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar space-y-3 pb-28">
+          <div className="flex items-center justify-between">
             <h3 className="font-semibold text-foreground">
               {headerDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
             </h3>
@@ -1091,67 +1089,70 @@ const PlannerPage = () => {
               const locked = isBlockLocked(block.date);
 
               return (
-                <div key={block.id} className="w-full bg-card rounded-2xl shadow-card p-4 sm:p-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-3">
-                  <div className="w-full rounded-xl bg-background/70 px-3 py-2 sm:w-auto sm:min-w-[48px] sm:bg-transparent sm:px-0 sm:py-0 text-left sm:text-center flex items-center justify-between sm:block">
-                    <p className="text-xs font-medium text-muted-foreground">{formatDisplayTime(block.startTime)}</p>
-                    <div className="hidden sm:block w-px h-4 bg-border mx-auto my-1" />
-                    <div className="sm:hidden h-px flex-1 bg-border mx-3" />
-                    <p className="text-xs font-medium text-muted-foreground">{formatDisplayTime(block.endTime)}</p>
-                  </div>
-
-                  <div className="w-full flex-1 min-w-0 border border-border/70 rounded-xl px-3 py-3 sm:px-4 sm:py-3 bg-background/70">
-                    <p className="text-xs text-muted-foreground font-medium mb-1">{block.subject}</p>
-                    <p className="text-base font-semibold text-foreground leading-snug mb-3">
-                      {block.topic?.trim() ? block.topic : "Add topic before lock"}
-                    </p>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-md ${SESSION_TYPE_COLORS[block.sessionType]}`}>
-                        {SESSION_TYPE_LABELS[block.sessionType]}
-                      </span>
-                      {locked ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive">
-                          <Lock size={12} /> Locked
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-muted-foreground">Editable until 11 PM previous day</span>
-                      )}
+                <div key={block.id} className="bg-card rounded-2xl shadow-card p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="text-center min-w-[44px]">
+                      <p className="text-xs font-medium text-muted-foreground">{formatDisplayTime(block.startTime)}</p>
+                      <div className="w-px h-4 bg-border mx-auto my-1" />
+                      <p className="text-xs font-medium text-muted-foreground">{formatDisplayTime(block.endTime)}</p>
                     </div>
+
+                    <div className="flex-1 min-w-0 border border-border/70 rounded-xl px-3 py-2 bg-background/70">
+                      <p className="text-xs text-muted-foreground font-medium -mt-1 mb-0.5">{block.subject}</p>
+                      <p className="text-base font-semibold text-foreground leading-tight mb-2 break-words">
+                        {block.topic?.trim() ? block.topic : "Add topic before lock"}
+                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-md ${SESSION_TYPE_COLORS[block.sessionType]}`}>
+                          {SESSION_TYPE_LABELS[block.sessionType]}
+                        </span>
+                        {locked ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive">
+                            <Lock size={12} /> Locked
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">Editable until 11 PM previous day</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {!locked ? (
+                      <div className="flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditForm({
+                              id: block.id,
+                              date: block.date,
+                              subject: block.subject,
+                              topic: block.topic ?? "",
+                              startTime: block.startTime,
+                              durationMinutes: String(getDurationBetweenTimes(block.startTime, block.endTime)),
+                              sessionType: block.sessionType,
+                            })
+                          }
+                          className="rounded-xl p-2 bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <PenSquare size={16} />
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
 
-                  <div className="w-full sm:w-auto flex flex-col gap-2 sm:items-end">
-                    {!locked ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditForm({
-                            id: block.id,
-                            date: block.date,
-                            subject: block.subject,
-                            topic: block.topic ?? "",
-                            startTime: block.startTime,
-                            durationMinutes: String(getDurationBetweenTimes(block.startTime, block.endTime)),
-                            sessionType: block.sessionType,
-                          })
-                        }
-                        className="w-full sm:w-auto rounded-xl p-2.5 bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <PenSquare size={16} />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPostponeBlock(block);
-                          setPostponeDate(addDays(block.date, 1));
-                          setPostponeStartTime(block.startTime);
-                          setPostponeDurationMinutes(String(getDurationBetweenTimes(block.startTime, block.endTime)));
-                        }}
-                        className="w-full sm:w-auto rounded-xl px-3 py-2.5 bg-accent text-xs font-semibold text-foreground hover:bg-primary/10 transition-colors"
-                      >
-                        Postpone
-                      </button>
-                    )}
-                  </div>
+                  {locked ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPostponeBlock(block);
+                        setPostponeDate(addDays(block.date, 1));
+                        setPostponeStartTime(block.startTime);
+                        setPostponeDurationMinutes(String(getDurationBetweenTimes(block.startTime, block.endTime)));
+                      }}
+                      className="mt-3 w-full rounded-xl px-3 py-2 bg-accent text-xs font-semibold text-foreground hover:bg-primary/10 transition-colors"
+                    >
+                      Postpone
+                    </button>
+                  ) : null}
                 </div>
               );
             })
@@ -1212,18 +1213,18 @@ const PlannerPage = () => {
                 </div>
 
                 {changeSubjectInputs.map((subject, index) => (
-                  <div key={index} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div key={index} className="flex items-center gap-2">
                     <Input
                       value={subject}
                       onChange={(event) => handleUpdateChangeSubjectInput(index, event.target.value)}
                       placeholder={`Subject ${index + 1}`}
-                      className="w-full rounded-xl h-11"
+                      className="rounded-xl h-11"
                     />
                     {changeSubjectInputs.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveChangeSubjectInput(index)}
-                        className="w-full rounded-xl px-3 py-2.5 text-xs font-semibold bg-accent text-muted-foreground hover:text-foreground sm:w-auto"
+                        className="rounded-xl px-3 py-2.5 text-xs font-semibold bg-accent text-muted-foreground hover:text-foreground"
                       >
                         Remove
                       </button>
