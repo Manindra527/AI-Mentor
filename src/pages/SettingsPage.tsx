@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchOwnProfile, uploadOwnProfilePhoto, upsertOwnProfile } from "@/lib/profiles";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +43,43 @@ const PLANNER_SETUP_KEY = "ai-mentor-planner-setup";
 const PLANNER_PLAN_KEY = "ai-mentor-plan-data";
 const PLANNER_SETUP_METADATA_KEY = "ai_mentor_planner_setup";
 const PLANNER_PLAN_METADATA_KEY = "ai_mentor_planner_plan";
+
+interface PlannerProfileSetup {
+  targetExam: string;
+  examDate: string;
+  availableHoursPerDay: number;
+}
+
+const parseOptionalNumber = (value: string) => {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const parsedValue = Number(trimmedValue);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+};
+
+const parsePlannerProfileSetup = (value: unknown): PlannerProfileSetup | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (
+    typeof candidate.targetExam === "string" &&
+    typeof candidate.examDate === "string" &&
+    typeof candidate.availableHoursPerDay === "number"
+  ) {
+    return {
+      targetExam: candidate.targetExam,
+      examDate: candidate.examDate,
+      availableHoursPerDay: candidate.availableHoursPerDay,
+    };
+  }
+
+  return null;
+};
 
 type SettingsView = "menu" | "profile" | "theme" | "weekStart" | "mentorMeeting" | "monthlyReview" | "notifications" | "moreOptions";
 
@@ -134,13 +172,17 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [view, setView] = useState<SettingsView>("menu");
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [profileName, setProfileName] = useState("Study Warrior");
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
+  const [profileUserId, setProfileUserId] = useState("");
+  const [profileName, setProfileName] = useState("");
   const [profilePhoto, setProfilePhoto] = useState("");
-  const [age, setAge] = useState("21");
+  const [selectedProfilePhotoFile, setSelectedProfilePhotoFile] = useState<File | null>(null);
+  const [age, setAge] = useState("");
   const [email, setEmail] = useState("");
-  const [targetExam, setTargetExam] = useState("UPSC CSE");
+  const [targetExam, setTargetExam] = useState("");
   const [examDate, setExamDate] = useState("");
-  const [dailyHoursGoal, setDailyHoursGoal] = useState("6");
+  const [dailyHoursGoal, setDailyHoursGoal] = useState("");
   const [weekStart, setWeekStart] = useState("Monday");
   const [mentorDay, setMentorDay] = useState("Sunday");
   const [mentorTime, setMentorTime] = useState("9:00 AM");
@@ -155,31 +197,132 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
   const monthlyReviewLabel =
     MONTHLY_REVIEW_OPTIONS.find((option) => option.value === monthlyReviewDay)?.label ?? "Day 1";
   const themeLabel = theme === "dark" ? "Dark" : "Light";
+  const hasProfileDetails = Boolean(
+    profileName.trim() || age.trim() || profilePhoto || targetExam.trim() || examDate || dailyHoursGoal.trim(),
+  );
+  const profileSummary = isProfileLoading
+    ? "Loading profile"
+    : profileName.trim() || targetExam.trim()
+      ? `${profileName.trim() || "Profile"} | ${targetExam.trim() || "No exam set"}`
+      : "Add name, exam, and study goal";
 
   useEffect(() => {
     let isMounted = true;
 
-    const loadUser = async () => {
+    const loadProfile = async () => {
+      setIsProfileLoading(true);
       const { data } = await supabase.auth.getUser();
       if (!isMounted) {
         return;
       }
 
-      setEmail(data.user?.email ?? "");
+      const user = data.user;
+      setEmail(user?.email ?? "");
+
+      if (!user) {
+        setProfileUserId("");
+        setIsProfileLoading(false);
+        return;
+      }
+
+      setProfileUserId(user.id);
+      const plannerSetup = parsePlannerProfileSetup(user.user_metadata?.[PLANNER_SETUP_METADATA_KEY]);
+      const { data: profile, error } = await fetchOwnProfile(user.id);
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (error && error.code !== "PGRST116") {
+        toast.error("Could not load your profile.");
+        setIsProfileLoading(false);
+        return;
+      }
+
+      if (profile) {
+        setProfileName(profile.full_name ?? "");
+        setProfilePhoto(profile.photo_url ?? "");
+        setAge(profile.age === null ? "" : String(profile.age));
+        setTargetExam(profile.target_exam ?? plannerSetup?.targetExam ?? "");
+        setExamDate(profile.exam_date ?? plannerSetup?.examDate ?? "");
+        setDailyHoursGoal(
+          profile.daily_hours_goal === null
+            ? plannerSetup?.availableHoursPerDay === undefined
+              ? ""
+              : String(plannerSetup.availableHoursPerDay)
+            : String(profile.daily_hours_goal),
+        );
+      } else if (plannerSetup) {
+        setTargetExam(plannerSetup.targetExam);
+        setExamDate(plannerSetup.examDate);
+        setDailyHoursGoal(String(plannerSetup.availableHoursPerDay));
+      }
+
+      setIsProfileLoading(false);
     };
 
-    void loadUser();
+    void loadProfile();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const handleProfileEditToggle = () => {
-    if (isEditingProfile) {
-      toast.success("Profile changes saved.");
+  const handleProfileEditToggle = async () => {
+    if (!isEditingProfile) {
+      setIsEditingProfile(true);
+      return;
     }
-    setIsEditingProfile((value) => !value);
+
+    if (!profileUserId) {
+      toast.error("Sign in again to save your profile.");
+      return;
+    }
+
+    setIsProfileSaving(true);
+    let nextProfilePhotoUrl = profilePhoto && !profilePhoto.startsWith("blob:") ? profilePhoto : null;
+
+    if (selectedProfilePhotoFile) {
+      const { data: uploadedPhotoUrl, error: uploadError } = await uploadOwnProfilePhoto(
+        profileUserId,
+        selectedProfilePhotoFile,
+      );
+
+      if (uploadError || !uploadedPhotoUrl) {
+        setIsProfileSaving(false);
+        toast.error("Could not upload profile photo. Please try again.");
+        return;
+      }
+
+      nextProfilePhotoUrl = uploadedPhotoUrl;
+    }
+
+    const { data: profile, error } = await upsertOwnProfile({
+      id: profileUserId,
+      full_name: profileName.trim() || null,
+      age: parseOptionalNumber(age),
+      photo_url: nextProfilePhotoUrl,
+      target_exam: targetExam.trim() || null,
+      exam_date: examDate || null,
+      daily_hours_goal: parseOptionalNumber(dailyHoursGoal),
+      updated_at: new Date().toISOString(),
+    });
+    setIsProfileSaving(false);
+
+    if (error) {
+      toast.error("Could not save profile. Please try again.");
+      return;
+    }
+
+    setProfileName(profile.full_name ?? "");
+    setProfilePhoto(profile.photo_url ?? "");
+    setAge(profile.age === null ? "" : String(profile.age));
+    setTargetExam(profile.target_exam ?? "");
+    setExamDate(profile.exam_date ?? "");
+    setDailyHoursGoal(profile.daily_hours_goal === null ? "" : String(profile.daily_hours_goal));
+    setSelectedProfilePhotoFile(null);
+    toast.success("Profile changes saved.");
+    setIsEditingProfile(false);
   };
 
   const handleProfilePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -189,14 +332,21 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
     }
 
     const objectUrl = URL.createObjectURL(file);
+    if (profilePhoto.startsWith("blob:")) {
+      URL.revokeObjectURL(profilePhoto);
+    }
     setProfilePhoto(objectUrl);
+    setSelectedProfilePhotoFile(file);
     toast.success("Profile photo updated.");
   };
 
   const handleProfilePhotoButtonClick = () => {
     if (profilePhoto) {
-      URL.revokeObjectURL(profilePhoto);
+      if (profilePhoto.startsWith("blob:")) {
+        URL.revokeObjectURL(profilePhoto);
+      }
       setProfilePhoto("");
+      setSelectedProfilePhotoFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -249,6 +399,20 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
     return (
       <DetailLayout title="Profile" onBack={() => setView("menu")}>
         <div className="space-y-4">
+          {isProfileLoading && (
+            <div className="bg-card rounded-2xl shadow-card p-5">
+              <p className="text-sm font-semibold text-foreground">Loading profile...</p>
+              <p className="text-xs text-muted-foreground mt-1">Fetching your saved profile details.</p>
+            </div>
+          )}
+
+          {!isProfileLoading && !hasProfileDetails && (
+            <div className="bg-card rounded-2xl shadow-card p-5">
+              <p className="text-sm font-semibold text-foreground">No profile saved yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Tap Edit to add your name, exam, date, and daily goal.</p>
+            </div>
+          )}
+
           <div className="bg-card rounded-2xl shadow-card p-5 space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div className="relative">
@@ -283,10 +447,11 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
               <button
                 type="button"
                 onClick={handleProfileEditToggle}
-                className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 gradient-primary text-primary-foreground font-semibold shadow-orange"
+                disabled={isProfileLoading || isProfileSaving}
+                className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 gradient-primary text-primary-foreground font-semibold shadow-orange disabled:opacity-60"
               >
                 {isEditingProfile ? <Save size={16} /> : <Pencil size={16} />}
-                {isEditingProfile ? "Save" : "Edit"}
+                {isProfileSaving ? "Saving..." : isEditingProfile ? "Save" : "Edit"}
               </button>
             </div>
 
@@ -636,7 +801,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
         <SettingsItem
           icon={UserCircle2}
           label="Profile"
-          value={`${profileName} | ${targetExam}`}
+          value={profileSummary}
           onClick={() => setView("profile")}
         />
         <SettingsItem

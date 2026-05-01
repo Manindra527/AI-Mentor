@@ -14,7 +14,144 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      planners: {
+        Row: {
+          available_hours_per_day: number | null
+          created_at: string | null
+          exam_date: string | null
+          id: string
+          plan_data: Json
+          subjects: string[]
+          target_exam: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          available_hours_per_day?: number | null
+          created_at?: string | null
+          exam_date?: string | null
+          id: string
+          plan_data?: Json
+          subjects?: string[]
+          target_exam?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          available_hours_per_day?: number | null
+          created_at?: string | null
+          exam_date?: string | null
+          id?: string
+          plan_data?: Json
+          subjects?: string[]
+          target_exam?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planners_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planner_entries: {
+        Row: {
+          completed: boolean | null
+          created_at: string | null
+          duration_minutes: number
+          entry_date: string
+          id: string
+          postponed_from_id: string | null
+          session_type: string
+          start_time: string
+          subject: string
+          topic: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          created_at?: string | null
+          duration_minutes: number
+          entry_date: string
+          id: string
+          postponed_from_id?: string | null
+          session_type: string
+          start_time: string
+          subject: string
+          topic?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          created_at?: string | null
+          duration_minutes?: number
+          entry_date?: string
+          id?: string
+          postponed_from_id?: string | null
+          session_type?: string
+          start_time?: string
+          subject?: string
+          topic?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planner_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          age: number | null
+          created_at: string | null
+          daily_hours_goal: number | null
+          exam_date: string | null
+          full_name: string | null
+          id: string
+          photo_url: string | null
+          target_exam: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          age?: number | null
+          created_at?: string | null
+          daily_hours_goal?: number | null
+          exam_date?: string | null
+          full_name?: string | null
+          id: string
+          photo_url?: string | null
+          target_exam?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          age?: number | null
+          created_at?: string | null
+          daily_hours_goal?: number | null
+          exam_date?: string | null
+          full_name?: string | null
+          id?: string
+          photo_url?: string | null
+          target_exam?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -3,6 +3,8 @@ import type { Session } from "@supabase/supabase-js";
 import Index from "@/pages/Index";
 import AuthPage, { type AuthPageMode } from "@/pages/AuthPage";
 import { supabase } from "@/integrations/supabase/client";
+import { clearAuthSession, ensureAuthSessionStarted, isAuthSessionExpired } from "@/lib/authSession";
+import { ensureOwnProfile } from "@/lib/profiles";
 
 const AuthGate = () => {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -20,9 +22,20 @@ const AuthGate = () => {
       }
 
       if (error || !data.session) {
+        clearAuthSession();
         setSession(null);
         return;
       }
+
+      if (isAuthSessionExpired()) {
+        clearAuthSession();
+        await supabase.auth.signOut();
+        setSession(null);
+        setShowAuth(true);
+        return;
+      }
+
+      ensureAuthSessionStarted();
 
       // Confirm the stored auth state is still valid before treating the user as signed in.
       const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -32,10 +45,12 @@ const AuthGate = () => {
       }
 
       if (userError || !userData.user) {
+        clearAuthSession();
         setSession(null);
         return;
       }
 
+      void ensureOwnProfile(userData.user.id, (userData.user.user_metadata?.full_name as string | undefined) ?? null);
       setSession(data.session);
     };
 
@@ -44,6 +59,30 @@ const AuthGate = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "SIGNED_OUT") {
+        clearAuthSession();
+        setSession(null);
+        return;
+      }
+
+      if (nextSession && isAuthSessionExpired()) {
+        clearAuthSession();
+        setSession(null);
+        setShowAuth(true);
+        void supabase.auth.signOut();
+        return;
+      }
+
+      if (event === "SIGNED_IN") {
+        ensureAuthSessionStarted();
+        if (nextSession?.user) {
+          void ensureOwnProfile(
+            nextSession.user.id,
+            (nextSession.user.user_metadata?.full_name as string | undefined) ?? null,
+          );
+        }
+      }
+
       setSession(nextSession);
 
       if (event === "PASSWORD_RECOVERY") {

@@ -23,6 +23,13 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchOwnPlanner,
+  fetchOwnPlannerEntries,
+  plannerEntriesToPlanData,
+  upsertOwnPlannerWithEntries,
+} from "@/lib/planners";
+import { upsertOwnProfile } from "@/lib/profiles";
 
 const SESSION_TYPES: SessionType[] = ["concept", "practice", "revision", "mock", "analysis"];
 const EXAM_OPTIONS = [
@@ -250,6 +257,20 @@ const loadPlanData = () => {
   }
 };
 
+const syncPlannerSetupToProfile = async (userId: string, setup: PlannerSetup | null) => {
+  if (!setup) {
+    return;
+  }
+
+  await upsertOwnProfile({
+    id: userId,
+    target_exam: setup.targetExam,
+    exam_date: setup.examDate,
+    daily_hours_goal: setup.availableHoursPerDay,
+    updated_at: new Date().toISOString(),
+  });
+};
+
 const formatDateKey = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -462,13 +483,37 @@ const PlannerPage = () => {
       const metadata = (data.user.user_metadata ?? {}) as Record<string, unknown>;
       plannerMetadataRef.current = metadata;
 
+      const { data: savedPlanner, error: plannerError } = await fetchOwnPlanner(data.user.id);
+      const { data: savedEntries, error: plannerEntriesError } = await fetchOwnPlannerEntries(data.user.id);
       const remoteSetup = parsePlannerSetupValue(metadata[PLANNER_SETUP_METADATA_KEY]);
       const remotePlan = parsePlanDataValue(metadata[PLANNER_PLAN_METADATA_KEY]);
       const localSetup = loadPlannerSetup();
       const localPlan = loadPlanData();
+      const plannerSetupFromTable =
+        savedPlanner &&
+        savedPlanner.target_exam &&
+        savedPlanner.exam_date &&
+        savedPlanner.available_hours_per_day !== null
+          ? {
+              targetExam: savedPlanner.target_exam,
+              examDate: savedPlanner.exam_date,
+              availableHoursPerDay: Number(savedPlanner.available_hours_per_day),
+              subjects: savedPlanner.subjects,
+            }
+          : null;
+      const plannerEntriesPlan = savedEntries && savedEntries.length > 0 ? plannerEntriesToPlanData(savedEntries) : null;
+      const plannerPlanBackup = savedPlanner ? parsePlanDataValue(savedPlanner.plan_data) : null;
 
-      const nextSetup = remoteSetup ?? localSetup;
-      const nextPlan = remotePlan ?? localPlan ?? {};
+      if (plannerError && plannerError.code !== "PGRST116") {
+        toast.error("Could not load planner from your account.");
+      }
+
+      if (plannerEntriesError) {
+        toast.error("Could not load planner entries from your account.");
+      }
+
+      const nextSetup = plannerSetupFromTable ?? remoteSetup ?? localSetup;
+      const nextPlan = plannerEntriesPlan ?? plannerPlanBackup ?? remotePlan ?? localPlan ?? {};
       const preferredDate = getPreferredPlannerDate(nextPlan);
 
       setPlannerSetup(nextSetup);
@@ -477,18 +522,12 @@ const PlannerPage = () => {
       setCalendarDate(preferredDate);
       lastSavedSnapshotRef.current = JSON.stringify({ plannerSetup: nextSetup, planData: nextPlan });
       setIsPlannerLoading(false);
+      void syncPlannerSetupToProfile(data.user.id, nextSetup);
 
-      if ((!remoteSetup && localSetup) || (!remotePlan && localPlan)) {
-        const nextMetadata = {
-          ...metadata,
-          [PLANNER_SETUP_METADATA_KEY]: nextSetup,
-          [PLANNER_PLAN_METADATA_KEY]: nextPlan,
-        };
-
-        const { error: saveError } = await supabase.auth.updateUser({ data: nextMetadata });
+      if ((!savedPlanner || !plannerEntriesPlan) && (nextSetup || Object.keys(nextPlan).length > 0)) {
+        const { error: saveError } = await upsertOwnPlannerWithEntries(data.user.id, nextSetup, nextPlan);
 
         if (!saveError && isMounted) {
-          plannerMetadataRef.current = nextMetadata;
           localStorage.removeItem(PLANNER_SETUP_KEY);
           localStorage.removeItem(PLANNER_PLAN_KEY);
         }
@@ -523,20 +562,28 @@ const PlannerPage = () => {
         return;
       }
 
-      const nextMetadata = {
-        ...plannerMetadataRef.current,
-        [PLANNER_SETUP_METADATA_KEY]: plannerSetup,
-        [PLANNER_PLAN_METADATA_KEY]: planData,
-      };
-
-      const { error: saveError } = await supabase.auth.updateUser({ data: nextMetadata });
+      const { error: saveError } = await upsertOwnPlannerWithEntries(data.user.id, plannerSetup, planData);
 
       if (saveError) {
         toast.error("Could not sync planner to your account.");
         return;
       }
 
-      plannerMetadataRef.current = nextMetadata;
+      if (plannerSetup) {
+        const { error: profileSyncError } = await upsertOwnProfile({
+          id: data.user.id,
+          target_exam: plannerSetup.targetExam,
+          exam_date: plannerSetup.examDate,
+          daily_hours_goal: plannerSetup.availableHoursPerDay,
+          updated_at: new Date().toISOString(),
+        });
+
+        if (profileSyncError) {
+          toast.error("Planner saved, but profile details could not be updated.");
+          return;
+        }
+      }
+
       lastSavedSnapshotRef.current = snapshot;
       localStorage.removeItem(PLANNER_SETUP_KEY);
       localStorage.removeItem(PLANNER_PLAN_KEY);
