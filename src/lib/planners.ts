@@ -148,3 +148,13 @@ export const upsertOwnPlannerWithEntries = async (
 
   return plannerResult;
 };
+
+export const resetOwnPlanner = async (userId: string) => {
+  const { error: entriesError } = await supabase.from("planner_entries").delete().eq("user_id", userId);
+  if (entriesError) {
+    return { error: entriesError };
+  }
+
+  const { error: plannerError } = await supabase.from("planners").delete().eq("id", userId);
+  return { error: plannerError };
+};

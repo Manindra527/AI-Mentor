@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
+import { resetOwnPlanner } from "@/lib/planners";
 import { fetchOwnProfile, uploadOwnProfilePhoto, upsertOwnProfile } from "@/lib/profiles";
 import {
   AlertDialog,
@@ -367,6 +368,12 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
       const nextMetadata = { ...metadata };
       delete nextMetadata[PLANNER_SETUP_METADATA_KEY];
       delete nextMetadata[PLANNER_PLAN_METADATA_KEY];
+
+      const { error: resetPlannerError } = await resetOwnPlanner(data.user.id);
+      if (resetPlannerError) {
+        toast.error("Local data was reset, but planner data could not be reset.");
+        return;
+      }
 
       const { error: saveError } = await supabase.auth.updateUser({ data: nextMetadata });
       if (saveError) {
