@@ -1157,9 +1157,7 @@ const PlannerPage = () => {
                           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive">
                             <Lock size={12} /> Locked
                           </span>
-                        ) : (
-                          <span className="text-[11px] text-muted-foreground">Editable until 11 PM previous day</span>
-                        )}
+                        ) : null }
                       </div>
                     </div>
 
