@@ -113,7 +113,7 @@ const AuthGate = () => {
         <div className="bg-card rounded-3xl shadow-card p-8 w-full max-w-sm text-center">
           <p className="text-sm font-semibold text-primary uppercase tracking-[0.2em]">AI Mentor</p>
           <h1 className="text-2xl font-bold text-foreground mt-3">Loading your study space</h1>
-          <p className="text-sm text-muted-foreground mt-2">Checking your session and getting things ready.</p>
+          <p className="text-sm text-muted-foreground mt-2">Make sure you are connected to the internet.</p>
         </div>
       </div>
     );
