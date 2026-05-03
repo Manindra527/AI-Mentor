@@ -341,8 +341,28 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
     toast.success("Profile photo updated.");
   };
 
-  const handleProfilePhotoButtonClick = () => {
+  const handleProfilePhotoButtonClick = async () => {
     if (profilePhoto) {
+      // Delete from storage
+      if (!profilePhoto.startsWith("blob:")) {
+         const filePath = profilePhoto.split("/profile-photos/")[1];
+
+         if (filePath) {
+            await supabase.storage
+               .from("profile-photos")
+               .remove([filePath]);
+         }
+      }
+
+      // Remove from DB
+      if (profileUserId) {
+         await supabase
+            .from("profiles")
+            .update({ photo_url: null })
+            .eq("id", profileUserId);
+      }
+      
+      // Remove from UI
       if (profilePhoto.startsWith("blob:")) {
         URL.revokeObjectURL(profilePhoto);
       }
@@ -434,8 +454,11 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                 </div>
                 <button
                   type="button"
-                  onClick={handleProfilePhotoButtonClick}
-                  className="absolute -left-1 bottom-1 w-8 h-8 rounded-full bg-card border border-border shadow-card flex items-center justify-center text-primary hover:bg-accent transition-colors"
+                  onClick={() => { 
+                     if (!isEditingProfile) return;
+                     handleProfilePhotoButtonClick();
+                    }}
+                 className={`absolute -left-1 bottom-1 w-8 h-8 rounded-full bg-card border border-border shadow-card flex items-center justify-center text-primary transition-colors ${isEditingProfile ? "hover:bg-accent" : "opacity-50 cursor-not-allowed"}`}
                   aria-label={profilePhoto ? "Remove profile photo" : "Change profile photo"}
                   title={profilePhoto ? "Remove profile photo" : "Change profile photo"}
                 >
@@ -447,7 +470,10 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={handleProfilePhotoChange}
+                  onChange={(e) => {
+                    if (!isEditingProfile) return;
+                    handleProfilePhotoChange(e);
+                  }}
                 />
               </div>
 
